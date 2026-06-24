@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LIFE — 余命診断</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+
+  :root {
+    --green: #00ff88;
+    --green-dim: #00cc66;
+    --green-dark: #003322;
+    --red: #ff3344;
+    --amber: #ffaa00;
+    --bg: #020c06;
+    --bg2: #041a0d;
+    --text: #c0f0d0;
+    --muted: #406050;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  /* ── SCANLINES ── */
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events:none;
+    z-index:9999;
+  }
+
+  canvas#ecg {
+    position:fixed; top:0; left:0; width:100%; height:60px;
+    opacity:.5; pointer-events:none; z-index:10;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:2rem 1.5rem; }
+  .screen.active { display:flex; }
+
+  /* ── TITLE ── */
+  #screen-title { text-align:center; gap:1.5rem; }
+
+  .title-life {
+    font-family:'Share Tech Mono', monospace;
+    font-size: clamp(5rem, 25vw, 9rem);
+    color: var(--green);
+    letter-spacing:.2em;
+    line-height:1;
+    text-shadow: 0 0 40px rgba(0,255,136,.4), 0 0 80px rgba(0,255,136,.15);
+    animation: pulse-title 3s ease-in-out infinite;
+  }
+  @keyframes pulse-title {
+    0%,100%{ text-shadow: 0 0 40px rgba(0,255,136,.4); }
+    50%{ text-shadow: 0 0 80px rgba(0,255,136,.8), 0 0 120px rgba(0,255,136,.3); }
+  }
+
+  .title-sub {
+    font-size:.85rem;
+    letter-spacing:.3em;
+    color: var(--muted);
+    margin-top:-.5rem;
+  }
+
+  .title-desc {
+    font-size:.85rem;
+    color: var(--muted);
+    line-height:1.8;
+    max-width:320px;
+    text-align:center;
+    border: 1px solid rgba(0,255,136,.1);
+    padding:1rem;
+    border-radius:4px;
+  }
+
+  /* ── INPUT SCREEN ── */
+  #screen-input { gap:1.5rem; max-width:400px; width:100%; }
+
+  .section-label {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.7rem;
+    letter-spacing:.25em;
+    color: var(--green-dim);
+    text-transform:uppercase;
+  }
+
+  .input-group { display:flex; flex-direction:column; gap:.5rem; width:100%; }
+
+  .dob-row { display:flex; gap:.5rem; align-items:center; }
+
+  .dob-row select {
+    flex:1;
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid rgba(0,255,136,.3);
+    padding:.7rem .5rem;
+    font-family:'Share Tech Mono', monospace;
+    font-size:.9rem;
+    border-radius:4px;
+    appearance:none;
+    -webkit-appearance:none;
+    text-align:center;
+    cursor:pointer;
+  }
+  .dob-row select:focus { outline: 1px solid var(--green); }
+
+  .name-input {
+    width:100%;
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid rgba(0,255,136,.3);
+    padding:.8rem 1rem;
+    font-family:'Share Tech Mono', monospace;
+    font-size:.9rem;
+    border-radius:4px;
+    letter-spacing:.1em;
+  }
+  .name-input:focus { outline: 1px solid var(--green); }
+  .name-input::placeholder { color: var(--muted); }
+
+  /* ── BUTTONS ── */
+  .btn-main {
+    width:100%;
+    padding:1rem;
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+    font-family:'Share Tech Mono', monospace;
+    font-size:1rem;
+    letter-spacing:.2em;
+    cursor:pointer;
+    border-radius:4px;
+    transition: background .15s, box-shadow .15s;
+    position:relative;
+    overflow:hidden;
+  }
+  .btn-main:hover, .btn-main:active {
+    background: rgba(0,255,136,.08);
+    box-shadow: 0 0 20px rgba(0,255,136,.2);
+  }
+
+  /* ── GAME SCREEN ── */
+  #screen-game { gap:0; padding:1rem; justify-content:flex-start; padding-top:70px; }
+
+  .life-bar-wrap { width:100%; margin-bottom:1rem; }
+  .life-label { display:flex; justify-content:space-between; font-family:'Share Tech Mono', monospace; font-size:.7rem; color: var(--muted); margin-bottom:.3rem; }
+  .life-bar-track {
+    width:100%; height:8px;
+    background: rgba(255,255,255,.05);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .life-bar-fill {
+    height:100%;
+    background: var(--green);
+    border-radius:4px;
+    transition: width .4s ease, background .4s;
+    box-shadow: 0 0 8px rgba(0,255,136,.5);
+  }
+
+  .life-days {
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(1.8rem, 8vw, 2.5rem);
+    color: var(--green);
+    text-align:center;
+    letter-spacing:.05em;
+    margin-bottom:.2rem;
+  }
+  .life-days-label { font-size:.65rem; letter-spacing:.25em; color: var(--muted); text-align:center; margin-bottom:1rem; }
+
+  /* GENRE BADGE */
+  .genre-badge {
+    display:inline-block;
+    font-family:'Share Tech Mono', monospace;
+    font-size:.65rem;
+    letter-spacing:.2em;
+    padding:.25rem .7rem;
+    border-radius:2px;
+    margin-bottom:.8rem;
+  }
+  .genre-食事 { background:rgba(255,170,0,.1); color:#ffaa00; border:1px solid rgba(255,170,0,.3); }
+  .genre-体力 { background:rgba(0,255,136,.1); color:#00ff88; border:1px solid rgba(0,255,136,.3); }
+  .genre-精神 { background:rgba(180,100,255,.1); color:#b464ff; border:1px solid rgba(180,100,255,.3); }
+  .genre-環境 { background:rgba(0,200,255,.1); color:#00c8ff; border:1px solid rgba(0,200,255,.3); }
+  .genre-技術 { background:rgba(255,200,0,.1); color:#ffc800; border:1px solid rgba(255,200,0,.3); }
+  .genre-運   { background:rgba(255,80,80,.1); color:#ff5050; border:1px solid rgba(255,80,80,.3); }
+
+  /* QUESTION */
+  .question-box {
+    background: var(--bg2);
+    border: 1px solid rgba(0,255,136,.15);
+    border-radius:6px;
+    padding:1.2rem 1rem;
+    margin-bottom:1rem;
+    min-height:120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    font-size:clamp(.9rem, 3.5vw, 1.05rem);
+    line-height:1.7;
+    position:relative;
+    width:100%;
+  }
+
+  .q-num {
+    position:absolute;
+    top:.5rem; left:.7rem;
+    font-family:'Share Tech Mono', monospace;
+    font-size:.6rem;
+    color: var(--muted);
+  }
+
+  /* TIMER */
+  .timer-wrap { width:100%; margin-bottom:.8rem; }
+  .timer-track {
+    width:100%; height:4px;
+    background: rgba(255,255,255,.05);
+    border-radius:2px;
+    overflow:hidden;
+  }
+  .timer-fill {
+    height:100%;
+    background: var(--green);
+    border-radius:2px;
+    transition: width .1s linear, background .3s;
+  }
+  .timer-sec {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.75rem;
+    color: var(--muted);
+    text-align:right;
+    margin-top:.2rem;
+  }
+
+  /* ANSWER BUTTONS */
+  .answer-row { display:flex; gap:.8rem; width:100%; }
+  .btn-yes, .btn-no {
+    flex:1;
+    padding:1rem;
+    font-family:'Share Tech Mono', monospace;
+    font-size:1rem;
+    letter-spacing:.15em;
+    border-radius:4px;
+    cursor:pointer;
+    border:1px solid;
+    transition: all .1s;
+    min-height:60px;
+  }
+  .btn-yes {
+    background: rgba(0,255,136,.07);
+    color: var(--green);
+    border-color: rgba(0,255,136,.4);
+  }
+  .btn-yes:active { background: rgba(0,255,136,.2); }
+  .btn-no {
+    background: rgba(255,51,68,.07);
+    color: var(--red);
+    border-color: rgba(255,51,68,.4);
+  }
+  .btn-no:active { background: rgba(255,51,68,.2); }
+
+  .key-hint { font-size:.6rem; color: var(--muted); text-align:center; margin-top:.5rem; letter-spacing:.1em; }
+
+  /* FEEDBACK OVERLAY */
+  .feedback {
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(2rem, 12vw, 4rem);
+    font-weight:bold;
+    letter-spacing:.1em;
+    pointer-events:none;
+    z-index:200;
+    opacity:0;
+    transition: opacity .1s;
+  }
+  .feedback.good { color: var(--green); text-shadow: 0 0 40px var(--green); }
+  .feedback.bad  { color: var(--red);   text-shadow: 0 0 40px var(--red); }
+  .feedback.timeout { color: var(--amber); text-shadow: 0 0 40px var(--amber); }
+  .feedback.show { opacity:1; }
+
+  /* PROGRESS */
+  .progress-row {
+    display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center;
+    margin-top:.5rem; width:100%;
+  }
+  .progress-dot {
+    width:6px; height:6px; border-radius:50%;
+    background: var(--muted); opacity:.4;
+  }
+  .progress-dot.done-good  { background: var(--green); opacity:1; }
+  .progress-dot.done-bad   { background: var(--red); opacity:1; }
+  .progress-dot.done-skip  { background: var(--amber); opacity:.7; }
+  .progress-dot.current    { background: var(--green); opacity:1; box-shadow: 0 0 6px var(--green); }
+
+  /* ── RESULT SCREEN ── */
+  #screen-result { gap:1.2rem; max-width:420px; width:100%; text-align:center; }
+
+  .result-header {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.7rem;
+    letter-spacing:.3em;
+    color: var(--muted);
+  }
+
+  .result-name {
+    font-size:1.3rem;
+    font-weight:700;
+    color: var(--text);
+    letter-spacing:.1em;
+  }
+
+  .result-days {
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(3rem, 18vw, 5.5rem);
+    color: var(--green);
+    line-height:1;
+    text-shadow: 0 0 60px rgba(0,255,136,.5);
+  }
+  .result-days-label { font-size:.75rem; letter-spacing:.3em; color: var(--muted); }
+
+  .result-years {
+    font-family:'Share Tech Mono', monospace;
+    font-size:1.1rem;
+    color: var(--green-dim);
+  }
+
+  .result-stats {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:.5rem; width:100%;
+  }
+  .stat-cell {
+    background: var(--bg2);
+    border:1px solid rgba(0,255,136,.1);
+    padding:.7rem;
+    border-radius:4px;
+  }
+  .stat-val { font-family:'Share Tech Mono', monospace; font-size:1.2rem; color: var(--green); }
+  .stat-lbl { font-size:.65rem; color: var(--muted); margin-top:.2rem; letter-spacing:.1em; }
+
+  .result-msg {
+    font-size:.82rem;
+    color: var(--muted);
+    line-height:1.8;
+    border: 1px solid rgba(0,255,136,.08);
+    padding:1rem;
+    border-radius:4px;
+    text-align:left;
+  }
+
+  .btn-print {
+    width:100%;
+    padding:1rem;
+    background: rgba(0,255,136,.1);
+    color: var(--green);
+    border: 1px solid rgba(0,255,136,.4);
+    font-family:'Share Tech Mono', monospace;
+    font-size:.9rem;
+    letter-spacing:.2em;
+    cursor:pointer;
+    border-radius:4px;
+  }
+  .btn-retry {
+    width:100%;
+    padding:.8rem;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,.1);
+    font-family:'Share Tech Mono', monospace;
+    font-size:.8rem;
+    letter-spacing:.2em;
+    cursor:pointer;
+    border-radius:4px;
+  }
+
+  /* ── REVIEW SCREEN ── */
+  #screen-review {
+    gap:0; padding:1rem 1rem 2rem; justify-content:flex-start;
+    padding-top:70px; align-items:stretch;
+  }
+
+  .review-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:1rem; padding-bottom:.7rem;
+    border-bottom:1px solid rgba(0,255,136,.15);
+  }
+  .review-title {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.75rem; letter-spacing:.25em; color: var(--green);
+  }
+  .review-filter {
+    display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1rem;
+  }
+  .filter-btn {
+    padding:.3rem .6rem;
+    font-family:'Share Tech Mono', monospace;
+    font-size:.6rem; letter-spacing:.1em;
+    background:transparent; border:1px solid rgba(0,255,136,.2);
+    color: var(--muted); border-radius:3px; cursor:pointer;
+    transition: all .15s;
+  }
+  .filter-btn.active { background:rgba(0,255,136,.12); color:var(--green); border-color:rgba(0,255,136,.5); }
+
+  .review-list { display:flex; flex-direction:column; gap:.8rem; }
+
+  .review-card {
+    background: var(--bg2);
+    border:1px solid rgba(0,255,136,.1);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .review-card.correct { border-left:3px solid var(--green); }
+  .review-card.wrong   { border-left:3px solid var(--red); }
+  .review-card.timeout { border-left:3px solid var(--amber); }
+
+  .review-card-head {
+    display:flex; align-items:center; gap:.6rem;
+    padding:.7rem .8rem .4rem;
+  }
+  .review-qnum {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.6rem; color:var(--muted); min-width:2.5rem;
+  }
+  .review-verdict {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.65rem; padding:.15rem .45rem; border-radius:2px;
+    flex-shrink:0;
+  }
+  .verdict-correct { background:rgba(0,255,136,.12); color:var(--green); }
+  .verdict-wrong   { background:rgba(255,51,68,.12); color:var(--red); }
+  .verdict-timeout { background:rgba(255,170,0,.12); color:var(--amber); }
+
+  .review-genre-tag {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.55rem; padding:.1rem .4rem; border-radius:2px;
+    flex-shrink:0;
+  }
+
+  .review-q-text {
+    padding:.1rem .8rem .5rem 3.8rem;
+    font-size:.82rem; line-height:1.6; color:var(--text);
+  }
+
+  .review-answer-row {
+    display:flex; gap:.5rem; padding:0 .8rem .5rem 3.8rem;
+    font-family:'Share Tech Mono', monospace; font-size:.65rem;
+  }
+  .your-ans { color:var(--muted); }
+  .your-ans span { color:var(--text); }
+  .correct-ans { color:var(--muted); }
+  .correct-ans span { color:var(--green); }
+
+  .review-comment {
+    margin:.2rem .8rem .8rem;
+    padding:.7rem .8rem;
+    background: rgba(0,0,0,.2);
+    border-radius:4px;
+    font-size:.78rem;
+    line-height:1.75;
+    color: var(--text);
+    opacity:.9;
+  }
+  .review-comment::before {
+    content:'▶ ';
+    font-family:'Share Tech Mono', monospace;
+    font-size:.6rem;
+    color:var(--green-dim);
+  }
+
+  .review-back {
+    margin-top:1.5rem;
+    width:100%;
+    padding:.8rem;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,.1);
+    font-family:'Share Tech Mono', monospace;
+    font-size:.8rem; letter-spacing:.2em;
+    cursor:pointer; border-radius:4px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="ecg"></canvas>
+<div class="feedback" id="feedback"></div>
+
+<!-- ══ TITLE SCREEN ══ -->
+<div class="screen active" id="screen-title">
+  <div class="title-life" id="title-anim">LIFE</div>
+  <div class="title-sub">余命診断システム</div>
+  <div class="title-desc">
+    あなたの生活習慣を問う500の問いに答え、<br>
+    残された命の長さを測定します。<br>
+    制限時間5秒。真実だけを答えよ。
+  </div>
+  <br>
+  <button class="btn-main" onclick="showScreen('input')" style="max-width:300px">[ 診断を開始する ]</button>
+</div>
+
+<!-- ══ INPUT SCREEN ══ -->
+<div class="screen" id="screen-input">
+  <div class="section-label">患者情報の入力</div>
+  <div class="input-group">
+    <div class="section-label" style="font-size:.65rem">氏名 (任意)</div>
+    <input class="name-input" id="name-input" type="text" placeholder="例: 山田 太郎" maxlength="20">
+  </div>
+  <div class="input-group">
+    <div class="section-label" style="font-size:.65rem">生年月日</div>
+    <div class="dob-row">
+      <select id="dob-y" style="flex:1.4"></select>
+      <select id="dob-m"></select>
+      <select id="dob-d"></select>
+    </div>
+  </div>
+  <div class="input-group">
+    <div class="section-label" style="font-size:.65rem">性別</div>
+    <div class="dob-row">
+      <select id="gender" style="flex:1">
+        <option value="male">男性</option>
+        <option value="female">女性</option>
+        <option value="other">その他</option>
+      </select>
+    </div>
+  </div>
+  <div class="input-group">
+    <div class="section-label" style="font-size:.65rem">診断問題数</div>
+    <div class="dob-row">
+      <select id="q-count" style="flex:1">
+        <option value="20">20問（短め）</option>
+        <option value="40" selected>40問（標準）</option>
+        <option value="60">60問（長め）</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn-main" onclick="startGame()">[ 診断開始 ]</button>
+  <button class="btn-retry" onclick="showScreen('title')">← 戻る</button>
+</div>
+
+<!-- ══ GAME SCREEN ══ -->
+<div class="screen" id="screen-game">
+  <div class="life-bar-wrap">
+    <div class="life-label">
+      <span>LIFE</span>
+      <span id="life-pct">100%</span>
+    </div>
+    <div class="life-bar-track">
+      <div class="life-bar-fill" id="life-bar" style="width:100%"></div>
+    </div>
+  </div>
+  <div class="life-days" id="life-days-display">—</div>
+  <div class="life-days-label">DAYS REMAINING</div>
+  <div id="genre-badge" class="genre-badge genre-食事">食事</div>
+  <div class="question-box" id="question-box">
+    <span class="q-num" id="q-num">Q1</span>
+    <span id="question-text">…</span>
+  </div>
+  <div class="timer-wrap">
+    <div class="timer-track"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+    <div class="timer-sec" id="timer-sec">5.0</div>
+  </div>
+  <div class="answer-row">
+    <button class="btn-yes" id="btn-yes" onclick="answer(true)">← はい</button>
+    <button class="btn-no"  id="btn-no"  onclick="answer(false)">いいえ →</button>
+  </div>
+  <div class="key-hint">PCキー: ← はい ／ → いいえ</div>
+  <div class="progress-row" id="progress-row"></div>
+</div>
+
+<!-- ══ RESULT SCREEN ══ -->
+<div class="screen" id="screen-result">
+  <div class="result-header">— 診断結果 —</div>
+  <div class="result-name" id="result-name">山田 太郎</div>
+  <div class="result-days" id="result-days">12,450</div>
+  <div class="result-days-label">DAYS TO LIVE</div>
+  <div class="result-years" id="result-years">約 34.1 年</div>
+  <div class="result-stats" id="result-stats"></div>
+  <div class="result-msg" id="result-msg"></div>
+  <button class="btn-print" onclick="showReview()">[ 回答レビューを見る ]</button>
+  <button class="btn-retry" onclick="restart()">← もう一度診断する</button>
+</div>
+
+<!-- ══ REVIEW SCREEN ══ -->
+<div class="screen" id="screen-review">
+  <div class="review-header">
+    <div class="review-title">回答レビュー</div>
+    <button class="filter-btn" onclick="showScreen('result')" style="border-color:rgba(0,255,136,.4);color:var(--green)">← 結果に戻る</button>
+  </div>
+  <div class="review-filter" id="review-filter">
+    <button class="filter-btn active" onclick="filterReview('all',this)">すべて</button>
+    <button class="filter-btn" onclick="filterReview('correct',this)">正解</button>
+    <button class="filter-btn" onclick="filterReview('wrong',this)">誤答</button>
+    <button class="filter-btn" onclick="filterReview('timeout',this)">時間切れ</button>
+    <button class="filter-btn" onclick="filterReview('食事',this)">食事</button>
+    <button class="filter-btn" onclick="filterReview('体力',this)">体力</button>
+    <button class="filter-btn" onclick="filterReview('精神',this)">精神</button>
+    <button class="filter-btn" onclick="filterReview('環境',this)">環境</button>
+    <button class="filter-btn" onclick="filterReview('技術',this)">技術</button>
+    <button class="filter-btn" onclick="filterReview('運',this)">運</button>
+  </div>
+  <div class="review-list" id="review-list"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   ECG CANVAS
+═══════════════════════════════════════════════════ */
+const ecgCanvas = document.getElementById('ecg');
+const ecgCtx = ecgCanvas.getContext('2d');
+let ecgData = [];
+let ecgX = 0;
+let ecgSpeed = 3;
+let ecgBeat = 0;
+let heartRate = 1;
+
+function resizeEcg(){
+  ecgCanvas.width = window.innerWidth;
+  ecgCanvas.height = 60;
+  ecgData = new Array(ecgCanvas.width).fill(30);
+}
+resizeEcg();
+window.addEventListener('resize', resizeEcg);
+
+function ecgWave(x){
+  const period = Math.max(40, 140 - heartRate * 15);
+  const pos = x % period;
+  if(pos < 5) return 0;
+  if(pos < 8) return -8;
+  if(pos < 10) return 25;
+  if(pos < 13) return -12;
+  if(pos < 16) return 3;
+  return 0;
+}
+
+function drawEcg(){
+  ecgCtx.clearRect(0,0,ecgCanvas.width,ecgCanvas.height);
+  ecgBeat++;
+  const newY = 30 + ecgWave(ecgBeat) * (heartRate * 0.6 + 0.4);
+  ecgData.push(newY);
+  if(ecgData.length > ecgCanvas.width) ecgData.shift();
+
+  ecgCtx.strokeStyle = '#00ff88';
+  ecgCtx.lineWidth = 1.5;
+  ecgCtx.shadowBlur = 6;
+  ecgCtx.shadowColor = '#00ff88';
+  ecgCtx.beginPath();
+  ecgData.forEach((y,i)=>{ i===0?ecgCtx.moveTo(i,y):ecgCtx.lineTo(i,y); });
+  ecgCtx.stroke();
+  ecgCtx.shadowBlur = 0;
+}
+setInterval(drawEcg, 16);
+
+/* ═══════════════════════════════════════════════════
+   AUDIO ENGINE
+═══════════════════════════════════════════════════ */
+let audioCtx = null;
+function getAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, dur, type='sine', gain=0.3, detune=0){
+  try {
+    const ac = getAudio();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type = type; o.frequency.value = freq; o.detune.value = detune;
+    g.gain.setValueAtTime(gain, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    o.start(); o.stop(ac.currentTime + dur);
+  } catch(e){}
+}
+
+function playHeartbeat(){
+  playTone(80, .08, 'sine', .35);
+  setTimeout(()=>playTone(70, .1, 'sine', .25), 80);
+}
+
+function playGood(){
+  playTone(523, .1, 'square', .2);
+  setTimeout(()=>playTone(659, .1, 'square', .2), 80);
+  setTimeout(()=>playTone(784, .2, 'square', .2), 160);
+}
+
+function playBad(){
+  playTone(200, .15, 'sawtooth', .25);
+  setTimeout(()=>playTone(150, .3, 'sawtooth', .2), 100);
+}
+
+function playTimeout(){
+  playTone(300, .5, 'square', .2);
+  setTimeout(()=>playTone(250, .5, 'square', .15), 400);
+}
+
+function playTick(){
+  playTone(1200, .03, 'square', .07);
+}
+
+function playCountdown(){
+  playTone(880, .1, 'sine', .25);
+}
+
+function playGameStart(){
+  [261,329,392,523].forEach((f,i)=>setTimeout(()=>playTone(f,.15,'square',.2), i*120));
+}
+
+function playGameEnd(){
+  [523,392,329,261,220].forEach((f,i)=>setTimeout(()=>playTone(f,.2,'sine',.3), i*150));
+}
+
+/* heartbeat interval */
+let hbInterval = null;
+function startHeartbeat(rate){
+  heartRate = rate;
+  clearInterval(hbInterval);
+  const bpm = Math.max(30, Math.min(200, rate * 20 + 40));
+  const interval = 60000 / bpm;
+  hbInterval = setInterval(playHeartbeat, interval);
+}
+function stopHeartbeat(){ clearInterval(hbInterval); }
+
+/* ═══════════════════════════════════════════════════
+   QUESTIONS DATABASE (500問)
+═══════════════════════════════════════════════════ */
+const QUESTIONS = [
+  // 食事 (100問)
+  {q:"毎日3食を規則正しく食べていますか？", correct:true, genre:"食事"},
+  {q:"野菜を毎日1日350g以上食べていますか？", correct:true, genre:"食事"},
+  {q:"朝食を毎日食べていますか？", correct:true, genre:"食事"},
+  {q:"加工食品や即席食品を週4回以上食べますか？", correct:false, genre:"食事"},
+  {q:"塩分を1日6g未満に抑えていますか？", correct:true, genre:"食事"},
+  {q:"毎日果物を食べていますか？", correct:true, genre:"食事"},
+  {q:"週2回以上魚を食べていますか？", correct:true, genre:"食事"},
+  {q:"清涼飲料水を毎日500ml以上飲んでいますか？", correct:false, genre:"食事"},
+  {q:"水を1日1.5リットル以上飲んでいますか？", correct:true, genre:"食事"},
+  {q:"揚げ物を週3回以上食べていますか？", correct:false, genre:"食事"},
+  {q:"赤肉（牛・豚）を週4回以上食べますか？", correct:false, genre:"食事"},
+  {q:"食事中によく噛んで食べていますか？", correct:true, genre:"食事"},
+  {q:"夜10時以降に食事をすることが多いですか？", correct:false, genre:"食事"},
+  {q:"食物繊維を毎日意識して摂っていますか？", correct:true, genre:"食事"},
+  {q:"乳製品を毎日摂取していますか？", correct:true, genre:"食事"},
+  {q:"食事のカロリーを気にして食べていますか？", correct:true, genre:"食事"},
+  {q:"早食いの習慣がありますか？", correct:false, genre:"食事"},
+  {q:"間食が1日2回以上ありますか？", correct:false, genre:"食事"},
+  {q:"発酵食品（納豆・ヨーグルト等）を週3回以上食べますか？", correct:true, genre:"食事"},
+  {q:"食事を抜くことが週2回以上ありますか？", correct:false, genre:"食事"},
+  {q:"食事のバランスを毎食意識していますか？", correct:true, genre:"食事"},
+  {q:"外食の頻度は週5回以上ですか？", correct:false, genre:"食事"},
+  {q:"豆腐や大豆製品を週3回以上食べますか？", correct:true, genre:"食事"},
+  {q:"アルコールを毎日飲みますか？", correct:false, genre:"食事"},
+  {q:"コレステロールの高い食品を意識して控えていますか？", correct:true, genre:"食事"},
+  {q:"砂糖の摂取を意識して減らしていますか？", correct:true, genre:"食事"},
+  {q:"朝食はパンだけ、または菓子類だけですか？", correct:false, genre:"食事"},
+  {q:"スナック菓子を毎日食べていますか？", correct:false, genre:"食事"},
+  {q:"週に1回以上、自炊していますか？", correct:true, genre:"食事"},
+  {q:"食後すぐ横になる習慣がありますか？", correct:false, genre:"食事"},
+  {q:"鉄分・カルシウム・亜鉛を意識して摂っていますか？", correct:true, genre:"食事"},
+  {q:"週3回以上、牛乳または豆乳を飲んでいますか？", correct:true, genre:"食事"},
+  {q:"食事を楽しんで食べていますか？", correct:true, genre:"食事"},
+  {q:"缶コーヒーや砂糖入り飲料を1日2本以上飲みますか？", correct:false, genre:"食事"},
+  {q:"食欲がないことが週3回以上ありますか？", correct:false, genre:"食事"},
+  {q:"食後に甘いものを必ず食べますか？", correct:false, genre:"食事"},
+  {q:"緑黄色野菜を毎日食べていますか？", correct:true, genre:"食事"},
+  {q:"カリウムの多い食品を意識して摂っていますか？", correct:true, genre:"食事"},
+  {q:"コンビニ食が週5日以上ですか？", correct:false, genre:"食事"},
+  {q:"深夜0時以降に食事をすることが週2回以上ありますか？", correct:false, genre:"食事"},
+  {q:"オメガ3脂肪酸（魚油・亜麻仁油等）を摂取していますか？", correct:true, genre:"食事"},
+  {q:"ビタミンCを多く含む食品を毎日食べていますか？", correct:true, genre:"食事"},
+  {q:"食事の時間が毎日バラバラですか？", correct:false, genre:"食事"},
+  {q:"プロテイン（タンパク質）を毎日意識して摂っていますか？", correct:true, genre:"食事"},
+  {q:"食事中にスマホを見ることが多いですか？", correct:false, genre:"食事"},
+  {q:"ナッツ類を週3回以上食べていますか？", correct:true, genre:"食事"},
+  {q:"週1回以上、腸活を意識した食事をしていますか？", correct:true, genre:"食事"},
+  {q:"毎食、炭水化物しか食べないことがありますか？", correct:false, genre:"食事"},
+  {q:"ポリフェノールを含む食品（ブルーベリー等）を週3回以上食べますか？", correct:true, genre:"食事"},
+  {q:"食事が楽しみでワクワクすることがありますか？", correct:true, genre:"食事"},
+  // 体力 (100問)
+  {q:"週3回以上、30分以上の有酸素運動をしていますか？", correct:true, genre:"体力"},
+  {q:"毎日1万歩以上歩いていますか？", correct:true, genre:"体力"},
+  {q:"週2回以上筋力トレーニングをしていますか？", correct:true, genre:"体力"},
+  {q:"1日8時間以上座りっぱなしですか？", correct:false, genre:"体力"},
+  {q:"エレベーターよりも階段を選ぶことが多いですか？", correct:true, genre:"体力"},
+  {q:"体重を定期的に測定していますか？", correct:true, genre:"体力"},
+  {q:"BMIが18.5〜24.9の範囲内ですか？", correct:true, genre:"体力"},
+  {q:"運動後にストレッチをしていますか？", correct:true, genre:"体力"},
+  {q:"週1回以上スポーツやアクティブな活動をしていますか？", correct:true, genre:"体力"},
+  {q:"息切れなく10分間早歩きができますか？", correct:true, genre:"体力"},
+  {q:"1日の歩数が3000歩未満の日が週3日以上ありますか？", correct:false, genre:"体力"},
+  {q:"定期的に体力測定（健康診断等）を受けていますか？", correct:true, genre:"体力"},
+  {q:"運動習慣が全くありませんか？", correct:false, genre:"体力"},
+  {q:"柔軟性を維持するためストレッチをほぼ毎日していますか？", correct:true, genre:"体力"},
+  {q:"腰痛や膝痛が慢性的にありますか？", correct:false, genre:"体力"},
+  {q:"水泳や自転車など低負荷の有酸素運動を習慣にしていますか？", correct:true, genre:"体力"},
+  {q:"運動した翌日は体が回復していると感じますか？", correct:true, genre:"体力"},
+  {q:"立ち仕事よりも座り仕事が主体ですか？", correct:false, genre:"体力"},
+  {q:"週5日以上、合計150分の中強度運動をしていますか？", correct:true, genre:"体力"},
+  {q:"运动中に胸痛や息切れを感じることがありますか？", correct:false, genre:"体力"},
+  {q:"握力が年齢平均以上だと思いますか？", correct:true, genre:"体力"},
+  {q:"階段を1階上がっただけで息が切れますか？", correct:false, genre:"体力"},
+  {q:"体幹トレーニングを週2回以上していますか？", correct:true, genre:"体力"},
+  {q:"運動習慣を20年以上続けていますか？", correct:true, genre:"体力"},
+  {q:"自転車や徒歩での通勤をしていますか？", correct:true, genre:"体力"},
+  {q:"ウォーキング以外の運動を月1回もしていませんか？", correct:false, genre:"体力"},
+  {q:"体重が過去5年で10kg以上増えましたか？", correct:false, genre:"体力"},
+  {q:"週末に全く体を動かさないことが多いですか？", correct:false, genre:"体力"},
+  {q:"心拍数が安静時60〜80bpm程度ですか？", correct:true, genre:"体力"},
+  {q:"毎朝軽い体操や運動をしていますか？", correct:true, genre:"体力"},
+  {q:"バランス感覚のトレーニングをしていますか？", correct:true, genre:"体力"},
+  {q:"1時間以上の運動を週2回以上していますか？", correct:true, genre:"体力"},
+  {q:"筋肉量を維持するよう意識していますか？", correct:true, genre:"体力"},
+  {q:"慢性的な疲労感がありますか？", correct:false, genre:"体力"},
+  {q:"毎朝起き上がるのに苦労することが多いですか？", correct:false, genre:"体力"},
+  {q:"週3回以上、屋外で体を動かしていますか？", correct:true, genre:"体力"},
+  {q:"運動後に十分な水分補給をしていますか？", correct:true, genre:"体力"},
+  {q:"転倒したことが最近1年以内にありますか？", correct:false, genre:"体力"},
+  {q:"適切な運動強度（ちょうどきつい程度）で運動していますか？", correct:true, genre:"体力"},
+  {q:"スポーツジムや運動施設に月2回以上通っていますか？", correct:true, genre:"体力"},
+  {q:"体力に自信がありますか？", correct:true, genre:"体力"},
+  {q:"週1回も歩かない日がある週が月3回以上ありますか？", correct:false, genre:"体力"},
+  {q:"足腰が弱いと感じることがありますか？", correct:false, genre:"体力"},
+  {q:"スポーツや運動が好きですか？", correct:true, genre:"体力"},
+  {q:"体を動かした後、爽快感を感じますか？", correct:true, genre:"体力"},
+  {q:"定期的なマラソンや競技参加をしていますか？", correct:true, genre:"体力"},
+  {q:"仕事や家事以外に体を動かす趣味がありますか？", correct:true, genre:"体力"},
+  {q:"肥満（BMI25以上）ですか？", correct:false, genre:"体力"},
+  {q:"毎日のルーティンに運動が含まれていますか？", correct:true, genre:"体力"},
+  {q:"体力の衰えを最近感じ始めましたか？", correct:false, genre:"体力"},
+  // 精神 (100問)
+  {q:"毎日7〜8時間の睡眠が取れていますか？", correct:true, genre:"精神"},
+  {q:"慢性的なストレスを感じていますか？", correct:false, genre:"精神"},
+  {q:"人生に前向きな目標がありますか？", correct:true, genre:"精神"},
+  {q:"趣味や好きなことに時間を使えていますか？", correct:true, genre:"精神"},
+  {q:"週2回以上、深刻な悩みで眠れない夜がありますか？", correct:false, genre:"精神"},
+  {q:"信頼できる友人や家族がいますか？", correct:true, genre:"精神"},
+  {q:"毎日感謝できることを意識していますか？", correct:true, genre:"精神"},
+  {q:"うつ状態が1週間以上続いたことが最近ありますか？", correct:false, genre:"精神"},
+  {q:"自分の感情をコントロールできていますか？", correct:true, genre:"精神"},
+  {q:"社会的なつながりを大切にしていますか？", correct:true, genre:"精神"},
+  {q:"孤独を強く感じることが多いですか？", correct:false, genre:"精神"},
+  {q:"笑うことが1日1回以上ありますか？", correct:true, genre:"精神"},
+  {q:"不安感が日常的に強いですか？", correct:false, genre:"精神"},
+  {q:"瞑想やマインドフルネスを実践していますか？", correct:true, genre:"精神"},
+  {q:"過去の失敗を引きずりやすいですか？", correct:false, genre:"精神"},
+  {q:"仕事とプライベートの区別ができていますか？", correct:true, genre:"精神"},
+  {q:"感情的に爆発することが週1回以上ありますか？", correct:false, genre:"精神"},
+  {q:"自己肯定感が高いと思いますか？", correct:true, genre:"精神"},
+  {q:"睡眠の質が良いと感じていますか？", correct:true, genre:"精神"},
+  {q:"週1回以上、新しいことに挑戦していますか？", correct:true, genre:"精神"},
+  {q:"仕事のストレスが家庭に影響していますか？", correct:false, genre:"精神"},
+  {q:"定期的に休暇や休息を取れていますか？", correct:true, genre:"精神"},
+  {q:"自分の強みを知っていますか？", correct:true, genre:"精神"},
+  {q:"悩みを人に相談できますか？", correct:true, genre:"精神"},
+  {q:"怒りが抑えられず他人を傷つけることがありますか？", correct:false, genre:"精神"},
+  {q:"毎朝すっきりと目覚めることができますか？", correct:true, genre:"精神"},
+  {q:"人と比較して自分を卑下することが多いですか？", correct:false, genre:"精神"},
+  {q:"自分の人生に満足していますか？", correct:true, genre:"精神"},
+  {q:"精神的なサポート（カウンセリング等）を必要と感じますか？", correct:false, genre:"精神"},
+  {q:"ポジティブな自己対話（セルフトーク）をしていますか？", correct:true, genre:"精神"},
+  {q:"長時間労働（週60時間以上）をしていますか？", correct:false, genre:"精神"},
+  {q:"他者への思いやりを大切にしていますか？", correct:true, genre:"精神"},
+  {q:"将来への漠然とした不安が常にありますか？", correct:false, genre:"精神"},
+  {q:"感情日記や反省日記をつけていますか？", correct:true, genre:"精神"},
+  {q:"脳への刺激として読書や学習を週2回以上していますか？", correct:true, genre:"精神"},
+  {q:"スマホを寝る1時間前にやめる習慣がありますか？", correct:true, genre:"精神"},
+  {q:"精神的に追い詰められていると感じることが多いですか？", correct:false, genre:"精神"},
+  {q:"過去1年間で大きな精神的トラウマがありましたか？", correct:false, genre:"精神"},
+  {q:"家族や友人と良好な関係を保っていますか？", correct:true, genre:"精神"},
+  {q:"生きがいを感じることが多いですか？", correct:true, genre:"精神"},
+  {q:"自分の感情を言葉にできますか？", correct:true, genre:"精神"},
+  {q:"怒りの感情を適切に処理できますか？", correct:true, genre:"精神"},
+  {q:"失敗から学ぶ姿勢がありますか？", correct:true, genre:"精神"},
+  {q:"他人に依存しすぎる傾向がありますか？", correct:false, genre:"精神"},
+  {q:"週1回は自分だけのリラックスタイムを持てていますか？", correct:true, genre:"精神"},
+  {q:"完璧主義すぎてストレスになっていますか？", correct:false, genre:"精神"},
+  {q:"メンタルヘルスを意識して日常生活を送っていますか？", correct:true, genre:"精神"},
+  {q:"過去より未来に意識を向けることができますか？", correct:true, genre:"精神"},
+  {q:"他者からの評価を過度に気にしますか？", correct:false, genre:"精神"},
+  {q:"精神的なバランスが保てていると感じますか？", correct:true, genre:"精神"},
+  // 環境 (100問)
+  {q:"自宅や職場の空気の質は良いですか？", correct:true, genre:"環境"},
+  {q:"定期的に部屋の換気をしていますか？", correct:true, genre:"環境"},
+  {q:"タバコを吸っていますか（自分）？", correct:false, genre:"環境"},
+  {q:"受動喫煙にさらされる環境にいますか？", correct:false, genre:"環境"},
+  {q:"定期的に健康診断を受けていますか？", correct:true, genre:"環境"},
+  {q:"大気汚染の少ない地域に住んでいますか？", correct:true, genre:"環境"},
+  {q:"職場の人間関係は良好ですか？", correct:true, genre:"環境"},
+  {q:"夜間に騒音で眠れないことがありますか？", correct:false, genre:"環境"},
+  {q:"自宅が整理整頓されていますか？", correct:true, genre:"環境"},
+  {q:"日常的に自然（公園・緑）に触れていますか？", correct:true, genre:"環境"},
+  {q:"水道水の安全性に問題がない地域に住んでいますか？", correct:true, genre:"環境"},
+  {q:"職場で化学物質や有害物質にさらされていますか？", correct:false, genre:"環境"},
+  {q:"週1回以上、外出して太陽光を浴びていますか？", correct:true, genre:"環境"},
+  {q:"職場のストレスが高い環境にいますか？", correct:false, genre:"環境"},
+  {q:"良好な医療へのアクセスがありますか？", correct:true, genre:"環境"},
+  {q:"電磁波の多い電子機器に長時間さらされていますか？", correct:false, genre:"環境"},
+  {q:"住環境は快適ですか（温度・湿度・採光等）？", correct:true, genre:"環境"},
+  {q:"家族や近所の人と良好な関係を保っていますか？", correct:true, genre:"環境"},
+  {q:"職場に安全衛生管理が整っていますか？", correct:true, genre:"環境"},
+  {q:"通勤時間が片道1時間以上かかりますか？", correct:false, genre:"環境"},
+  {q:"自宅の防災対策はできていますか？", correct:true, genre:"環境"},
+  {q:"室内の湿度を適切（40〜60%）に保っていますか？", correct:true, genre:"環境"},
+  {q:"アレルゲン（ホコリ・ダニ等）を除去するよう努めていますか？", correct:true, genre:"環境"},
+  {q:"仕事環境で長時間モニターを見ますか？", correct:false, genre:"環境"},
+  {q:"住んでいる地域の医療施設にアクセスしやすいですか？", correct:true, genre:"環境"},
+  {q:"農薬や食品添加物の少ない食品を意識して選んでいますか？", correct:true, genre:"環境"},
+  {q:"騒音のストレスが日常的にありますか？", correct:false, genre:"環境"},
+  {q:"ペットや植物など生き物との接触がありますか？", correct:true, genre:"環境"},
+  {q:"危険な地域（犯罪率・交通事故等）に住んでいますか？", correct:false, genre:"環境"},
+  {q:"勤務形態は自分に合っていますか？", correct:true, genre:"環境"},
+  {q:"引越し・転職など大きな環境変化が最近ありましたか？", correct:false, genre:"環境"},
+  {q:"定期的に部屋の掃除・除菌をしていますか？", correct:true, genre:"環境"},
+  {q:"就寝環境（暗さ・静けさ・温度）は整っていますか？", correct:true, genre:"環境"},
+  {q:"飲料水はフィルターや浄水器を通したものを使っていますか？", correct:true, genre:"環境"},
+  {q:"職場でパワハラやハラスメントを受けていますか？", correct:false, genre:"環境"},
+  {q:"自然災害リスクの低い地域に住んでいますか？", correct:true, genre:"環境"},
+  {q:"アウトドア活動が月1回以上ありますか？", correct:true, genre:"環境"},
+  {q:"住環境に満足していますか？", correct:true, genre:"環境"},
+  {q:"職場の照明は目に優しいですか？", correct:true, genre:"環境"},
+  {q:"有害なケミカルを使用した製品を日常的に使っていますか？", correct:false, genre:"環境"},
+  {q:"日当たりの良い場所に住んでいますか？", correct:true, genre:"環境"},
+  {q:"地域コミュニティとのつながりがありますか？", correct:true, genre:"環境"},
+  {q:"経済的な安定を感じていますか？", correct:true, genre:"環境"},
+  {q:"生活環境全体が健康的だと感じますか？", correct:true, genre:"環境"},
+  {q:"マイクロプラスチックを避けるよう意識していますか？", correct:true, genre:"環境"},
+  {q:"緑の多い公園が近くにありますか？", correct:true, genre:"環境"},
+  {q:"室内の温度管理（冷暖房）は適切にしていますか？", correct:true, genre:"環境"},
+  {q:"長時間通勤でストレスを感じていますか？", correct:false, genre:"環境"},
+  {q:"職場で適切な休憩が取れていますか？", correct:true, genre:"環境"},
+  {q:"自宅に緊急用の救急箱が備えてありますか？", correct:true, genre:"環境"},
+  // 技術 (100問)
+  {q:"かかりつけ医や主治医がいますか？", correct:true, genre:"技術"},
+  {q:"年1回以上の健康診断を受けていますか？", correct:true, genre:"技術"},
+  {q:"応急処置（AED・心肺蘇生）ができますか？", correct:true, genre:"技術"},
+  {q:"自分の血圧を定期的に測定していますか？", correct:true, genre:"技術"},
+  {q:"服薬管理を正確に行っていますか（必要な場合）？", correct:true, genre:"技術"},
+  {q:"自分のアレルギーや持病を正確に把握していますか？", correct:true, genre:"技術"},
+  {q:"緊急時の連絡先を把握していますか？", correct:true, genre:"技術"},
+  {q:"骨密度測定を受けたことがありますか？", correct:true, genre:"技術"},
+  {q:"がん検診を定期的に受けていますか？", correct:true, genre:"技術"},
+  {q:"予防接種（インフルエンザ等）を毎年受けていますか？", correct:true, genre:"技術"},
+  {q:"自分の体重変動を毎日記録していますか？", correct:true, genre:"技術"},
+  {q:"血糖値や血中脂質の数値を把握していますか？", correct:true, genre:"技術"},
+  {q:"自分の正常な体温を把握していますか？", correct:true, genre:"技術"},
+  {q:"医師の指示に従わないことが多いですか？", correct:false, genre:"技術"},
+  {q:"歯科健診を年1回以上受けていますか？", correct:true, genre:"技術"},
+  {q:"眼科検診を定期的に受けていますか？", correct:true, genre:"技術"},
+  {q:"薬の副作用を正しく理解していますか？", correct:true, genre:"技術"},
+  {q:"睡眠データ（アプリや機器）を活用していますか？", correct:true, genre:"技術"},
+  {q:"自分に合った運動強度を理解していますか？", correct:true, genre:"技術"},
+  {q:"栄養の知識を正しく持っていますか？", correct:true, genre:"技術"},
+  {q:"ストレスの自己管理技術を持っていますか？", correct:true, genre:"技術"},
+  {q:"救急車の呼び方と手順を知っていますか？", correct:true, genre:"技術"},
+  {q:"自分の遺伝的リスクを把握していますか？", correct:true, genre:"技術"},
+  {q:"食品ラベルを読んで栄養を確認していますか？", correct:true, genre:"技術"},
+  {q:"整骨院や鍼灸など代替医療を乱用していますか？", correct:false, genre:"技術"},
+  {q:"スマートウォッチや健康デバイスを活用していますか？", correct:true, genre:"技術"},
+  {q:"健康的な料理を自分で作れますか？", correct:true, genre:"技術"},
+  {q:"適切な睡眠技術（入眠儀式等）を持っていますか？", correct:true, genre:"技術"},
+  {q:"心理的なセルフケア技術を学んでいますか？", correct:true, genre:"技術"},
+  {q:"自分で体のシグナルを読み取れますか？", correct:true, genre:"技術"},
+  {q:"インターネットの健康情報を批判的に見ていますか？", correct:true, genre:"技術"},
+  {q:"医療機関への受診を過度に先延ばしにしていますか？", correct:false, genre:"技術"},
+  {q:"自分に合ったダイエット方法を知っていますか？", correct:true, genre:"技術"},
+  {q:"正しい姿勢維持の方法を知っていますか？", correct:true, genre:"技術"},
+  {q:"断食や極端なダイエットを繰り返していますか？", correct:false, genre:"技術"},
+  {q:"自分の体脂肪率を把握していますか？", correct:true, genre:"技術"},
+  {q:"医療費の管理ができていますか？", correct:true, genre:"技術"},
+  {q:"感染症予防（手洗い・マスク等）を正しく行っていますか？", correct:true, genre:"技術"},
+  {q:"心臓発作の兆候を知っていますか？", correct:true, genre:"技術"},
+  {q:"自分のメンタルヘルスを専門家に相談したことがありますか？", correct:true, genre:"技術"},
+  {q:"食事記録アプリや日記をつけていますか？", correct:true, genre:"技術"},
+  {q:"健康に関する書籍や情報を積極的に学んでいますか？", correct:true, genre:"技術"},
+  {q:"自分の体に合わないものを見極めることができますか？", correct:true, genre:"技術"},
+  {q:"薬を飲みすぎる（過剰摂取）傾向がありますか？", correct:false, genre:"技術"},
+  {q:"呼吸法（腹式呼吸等）を活用していますか？", correct:true, genre:"技術"},
+  {q:"定期的に自己健康チェックをしていますか？", correct:true, genre:"技術"},
+  {q:"健康についての目標を定期的に見直していますか？", correct:true, genre:"技術"},
+  {q:"慢性疾患の予防知識を持っていますか？", correct:true, genre:"技術"},
+  {q:"スポーツ障害の予防策を知っていますか？", correct:true, genre:"技術"},
+  {q:"自分の体の変化に敏感に気づけますか？", correct:true, genre:"技術"},
+  // 運 (100問)
+  {q:"交通事故に遭ったことが最近5年でありますか？", correct:false, genre:"運"},
+  {q:"大病を乗り越えた経験がありますか（回復できたなら）？", correct:true, genre:"運"},
+  {q:"長寿の家系ですか（両親・祖父母が長生き）？", correct:true, genre:"運"},
+  {q:"危険なスポーツや活動を定期的にしていますか？", correct:false, genre:"運"},
+  {q:"自然災害に遭遇したことがありますか（無事だったなら）？", correct:true, genre:"運"},
+  {q:"職場で重大な事故や怪我をしたことがありますか？", correct:false, genre:"運"},
+  {q:"普段から安全運転を心がけていますか？", correct:true, genre:"運"},
+  {q:"強いストレスが続く時期が1年以上続いていますか？", correct:false, genre:"運"},
+  {q:"経済的に安定した生活ができていますか？", correct:true, genre:"運"},
+  {q:"重大な病気（がん・心疾患等）の家族歴がありますか？", correct:false, genre:"運"},
+  {q:"友人や家族に強力なサポートネットワークがありますか？", correct:true, genre:"運"},
+  {q:"高所や水辺など危険な場所で事故を避けられていますか？", correct:true, genre:"運"},
+  {q:"過去に生死に関わる病気や怪我がありましたか？", correct:false, genre:"運"},
+  {q:"遺伝的な長寿因子を持っている可能性がありますか？", correct:true, genre:"運"},
+  {q:"社会的に孤立していると感じますか？", correct:false, genre:"運"},
+  {q:"良い医療を受けられる環境にいますか？", correct:true, genre:"運"},
+  {q:"過去に大きな心理的トラウマを乗り越えた経験がありますか？", correct:true, genre:"運"},
+  {q:"運やタイミングに恵まれていると感じることが多いですか？", correct:true, genre:"運"},
+  {q:"思わぬ幸運を経験したことがありますか？", correct:true, genre:"運"},
+  {q:"難しい困難を何度も乗り越えた経験がありますか？", correct:true, genre:"運"},
+  {q:"生まれた国や地域の医療水準は高いですか？", correct:true, genre:"運"},
+  {q:"これまで大きなギャンブルや無謀な投資をしてきましたか？", correct:false, genre:"運"},
+  {q:"自分は運が良い方だと思いますか？", correct:true, genre:"運"},
+  {q:"幼少期の生活環境は健康的でしたか？", correct:true, genre:"運"},
+  {q:"過去に喫煙習慣がありましたか（現在はない場合でも）？", correct:false, genre:"運"},
+  {q:"強い意志力で悪習慣をやめた経験がありますか？", correct:true, genre:"運"},
+  {q:"生涯を通じて体重管理に成功してきましたか？", correct:true, genre:"運"},
+  {q:"精神的に強く、逆境に耐えられますか？", correct:true, genre:"運"},
+  {q:"人生で達成感や喜びを多く感じてきましたか？", correct:true, genre:"運"},
+  {q:"最近1年以内に生活が大きく乱れた時期がありましたか？", correct:false, genre:"運"},
+  {q:"医療の恩恵を最大限受けられてきたと思いますか？", correct:true, genre:"運"},
+  {q:"幸福度が高い生活ができていると感じますか？", correct:true, genre:"運"},
+  {q:"これまでの人生で失うものが多かったと感じますか？", correct:false, genre:"運"},
+  {q:"良い習慣が長続きするタイプですか？", correct:true, genre:"運"},
+  {q:"不運な出来事が続いていると感じますか？", correct:false, genre:"運"},
+  {q:"健康診断で引っかかったことが最近ありましたか？", correct:false, genre:"運"},
+  {q:"自分の未来を楽観的に考えられますか？", correct:true, genre:"運"},
+  {q:"ストレスに強い体質だと思いますか？", correct:true, genre:"運"},
+  {q:"病気になっても立ち直りが早い体質ですか？", correct:true, genre:"運"},
+  {q:"楽天的な性格ですか？", correct:true, genre:"運"},
+  {q:"良い出会いや縁があったと思いますか？", correct:true, genre:"運"},
+  {q:"不必要なリスクを取ることが多いですか？", correct:false, genre:"運"},
+  {q:"健康管理に恵まれた環境に生まれましたか？", correct:true, genre:"運"},
+  {q:"これまでの人生で後悔が少ないですか？", correct:true, genre:"運"},
+  {q:"自分の寿命を伸ばせると信じていますか？", correct:true, genre:"運"},
+  {q:"挫折から立ち上がる力（回復力）がありますか？", correct:true, genre:"運"},
+  {q:"生きることへの強い意欲がありますか？", correct:true, genre:"運"},
+  {q:"健康という財産を大切にしてきましたか？", correct:true, genre:"運"},
+  {q:"自分の直感を信じて動けますか？", correct:true, genre:"運"},
+  {q:"人生にまだやりたいことがたくさんありますか？", correct:true, genre:"運"},
+
+  // ── 追加200問 ──
+  // 食事 追加33問
+  {q:"白米より玄米・雑穀米を選ぶことが多いですか？", correct:true, genre:"食事"},
+  {q:"食事の前に水を一杯飲む習慣がありますか？", correct:true, genre:"食事"},
+  {q:"マグネシウムを含む食品（ナッツ・海藻等）を週3回以上食べますか？", correct:true, genre:"食事"},
+  {q:"夕食の量が朝食より極端に多いですか？", correct:false, genre:"食事"},
+  {q:"食品添加物の表示を確認してから購入しますか？", correct:true, genre:"食事"},
+  {q:"プロバイオティクス（乳酸菌飲料等）を週2回以上摂りますか？", correct:true, genre:"食事"},
+  {q:"一口ごとによく味わって食べる習慣がありますか？", correct:true, genre:"食事"},
+  {q:"週3回以上、揚げ物以外の調理法で肉を食べていますか？", correct:true, genre:"食事"},
+  {q:"食後2時間以内に激しい運動をすることがありますか？", correct:false, genre:"食事"},
+  {q:"海藻類（わかめ・昆布・ひじき等）を週3回以上食べますか？", correct:true, genre:"食事"},
+  {q:"トランス脂肪酸の多いマーガリンや加工油を避けていますか？", correct:true, genre:"食事"},
+  {q:"食事記録をつけて栄養バランスを確認していますか？", correct:true, genre:"食事"},
+  {q:"週1回以上、豆類（大豆・小豆・ひよこ豆等）を食べますか？", correct:true, genre:"食事"},
+  {q:"食欲がなくても無理に食べ過ぎることがありますか？", correct:false, genre:"食事"},
+  {q:"新鮮な食材を優先して購入していますか？", correct:true, genre:"食事"},
+  {q:"食事の際、テレビやスマホを見ながら食べることが多いですか？", correct:false, genre:"食事"},
+  {q:"週2回以上、キノコ類（しいたけ・えのき等）を食べますか？", correct:true, genre:"食事"},
+  {q:"血糖値を上げやすい白砂糖より自然甘味料を選んでいますか？", correct:true, genre:"食事"},
+  {q:"季節の旬の食材を意識して食べていますか？", correct:true, genre:"食事"},
+  {q:"食事中に炭酸飲料を飲む習慣がありますか？", correct:false, genre:"食事"},
+  {q:"週1回以上、魚介類（エビ・タコ等）を食べますか？", correct:true, genre:"食事"},
+  {q:"食後に歯を磨く習慣がありますか？", correct:true, genre:"食事"},
+  {q:"インスタントラーメンを週2回以上食べますか？", correct:false, genre:"食事"},
+  {q:"飲み会や外食の翌日は食事量を減らして調整しますか？", correct:true, genre:"食事"},
+  {q:"緑茶やハーブティーを毎日飲む習慣がありますか？", correct:true, genre:"食事"},
+  {q:"食事の品数が毎食1品だけになることが多いですか？", correct:false, genre:"食事"},
+  {q:"スーパーで食品の産地を確認してから購入しますか？", correct:true, genre:"食事"},
+  {q:"週2回以上、自分でサラダを作って食べますか？", correct:true, genre:"食事"},
+  {q:"食べ残しを減らすよう意識していますか？", correct:true, genre:"食事"},
+  {q:"コーヒーを1日3杯以上飲みますか？", correct:false, genre:"食事"},
+  {q:"食前にお腹が鳴るほど空腹になることが多いですか？", correct:false, genre:"食事"},
+  {q:"旅行中も食事バランスを気にかけていますか？", correct:true, genre:"食事"},
+  {q:"週1回以上、温かいスープや汁物を食べていますか？", correct:true, genre:"食事"},
+
+  // 体力 追加34問
+  {q:"週1回以上、ヨガやピラティスをしていますか？", correct:true, genre:"体力"},
+  {q:"1日の中で意識的に姿勢を正す時間がありますか？", correct:true, genre:"体力"},
+  {q:"登山やハイキングを月1回以上していますか？", correct:true, genre:"体力"},
+  {q:"運動前にウォームアップをしていますか？", correct:true, genre:"体力"},
+  {q:"週2回以上、水泳やアクアビクスをしていますか？", correct:true, genre:"体力"},
+  {q:"長時間のデスクワーク中に定期的に立ち上がっていますか？", correct:true, genre:"体力"},
+  {q:"自分の最大心拍数を把握していますか？", correct:true, genre:"体力"},
+  {q:"筋肉痛のまま同じ部位のトレーニングを続けますか？", correct:false, genre:"体力"},
+  {q:"週3回以上、10分以上の速歩きをしていますか？", correct:true, genre:"体力"},
+  {q:"毎朝起き上がる前に軽いストレッチをしていますか？", correct:true, genre:"体力"},
+  {q:"自転車（サイクリング）を週2回以上利用しますか？", correct:true, genre:"体力"},
+  {q:"体を動かした後に十分な休息を取っていますか？", correct:true, genre:"体力"},
+  {q:"立ち仕事をしているときに足が極端にむくみますか？", correct:false, genre:"体力"},
+  {q:"週1回以上、スポーツ観戦ではなく実際に体を動かしていますか？", correct:true, genre:"体力"},
+  {q:"階段を使う際に手すりが必要なほど足腰が弱いですか？", correct:false, genre:"体力"},
+  {q:"体重の5〜10%の荷物を担いで30分歩けますか？", correct:true, genre:"体力"},
+  {q:"週2回以上、縄跳びや踏み台昇降をしていますか？", correct:true, genre:"体力"},
+  {q:"運動不足による腰痛や肩こりが慢性化していますか？", correct:false, genre:"体力"},
+  {q:"毎日同じ時間帯に運動する習慣がありますか？", correct:true, genre:"体力"},
+  {q:"暑い季節でも屋外で運動できていますか？", correct:true, genre:"体力"},
+  {q:"運動習慣が仕事の繁忙期に完全になくなってしまいますか？", correct:false, genre:"体力"},
+  {q:"自分の体力年齢が実年齢より若いと思いますか？", correct:true, genre:"体力"},
+  {q:"週1回以上、友人や家族と一緒に体を動かしていますか？", correct:true, genre:"体力"},
+  {q:"運動を始める前に医師や専門家に相談したことがありますか？", correct:true, genre:"体力"},
+  {q:"毎日5分以上の深呼吸や呼吸エクササイズをしていますか？", correct:true, genre:"体力"},
+  {q:"急激な体重増加（1ヶ月で3kg以上）が最近ありましたか？", correct:false, genre:"体力"},
+  {q:"週2回以上、ダンスや体を使う趣味を楽しんでいますか？", correct:true, genre:"体力"},
+  {q:"片足で10秒以上立ち続けられますか？", correct:true, genre:"体力"},
+  {q:"運動中に十分な水分補給を意識していますか？", correct:true, genre:"体力"},
+  {q:"体力回復のためにマッサージや整体を定期的に受けていますか？", correct:true, genre:"体力"},
+  {q:"スポーツ用の適切なシューズを使用して運動していますか？", correct:true, genre:"体力"},
+  {q:"季節ごとに運動の種類を変えて飽きずに続けていますか？", correct:true, genre:"体力"},
+  {q:"全力疾走（100m程度）を問題なく行えますか？", correct:true, genre:"体力"},
+  {q:"筋肉量の減少（サルコペニア）を意識して対策していますか？", correct:true, genre:"体力"},
+
+  // 精神 追加33問
+  {q:"毎日5分以上の瞑想や深呼吸を実践していますか？", correct:true, genre:"精神"},
+  {q:"怒りを感じたとき、まず10秒深呼吸する習慣がありますか？", correct:true, genre:"精神"},
+  {q:"他人の不幸を見て喜ぶ気持ちが起きることがありますか？", correct:false, genre:"精神"},
+  {q:"週1回以上、自分の気持ちを文字に書き出していますか？", correct:true, genre:"精神"},
+  {q:"睡眠前の1時間はリラックスできる活動をしていますか？", correct:true, genre:"精神"},
+  {q:"自分の失敗を引きずらず切り替えが早い方ですか？", correct:true, genre:"精神"},
+  {q:"人の意見を最後まで聞かずに話を遮ることが多いですか？", correct:false, genre:"精神"},
+  {q:"週1回以上、新しい場所や体験に挑戦していますか？", correct:true, genre:"精神"},
+  {q:"深夜12時以降もスマホを長時間使用しますか？", correct:false, genre:"精神"},
+  {q:"自分へのご褒美や小さな楽しみを日常に取り入れていますか？", correct:true, genre:"精神"},
+  {q:"怒りや悲しみを人にぶつけてしまうことが多いですか？", correct:false, genre:"精神"},
+  {q:"月1回以上、自然の中でゆっくり過ごす時間がありますか？", correct:true, genre:"精神"},
+  {q:"自分の弱さを認め、助けを求めることができますか？", correct:true, genre:"精神"},
+  {q:"SNSを1日2時間以上使用することが多いですか？", correct:false, genre:"精神"},
+  {q:"毎日、自分に対してポジティブな言葉をかけていますか？", correct:true, genre:"精神"},
+  {q:"人間関係のトラブルが絶えないと感じますか？", correct:false, genre:"精神"},
+  {q:"月1回以上、感動したり涙を流したりする体験がありますか？", correct:true, genre:"精神"},
+  {q:"「どうせ自分には無理」という思考が頻繁にありますか？", correct:false, genre:"精神"},
+  {q:"週1回以上、創造的な活動（絵・音楽・文章等）をしていますか？", correct:true, genre:"精神"},
+  {q:"悩みを誰にも相談できず一人で抱え込むことが多いですか？", correct:false, genre:"精神"},
+  {q:"自分の長所を3つ以上言えますか？", correct:true, genre:"精神"},
+  {q:"仕事や勉強に過度に没頭し休息を忘れることがありますか？", correct:false, genre:"精神"},
+  {q:"他者の良いところを素直に称賛できますか？", correct:true, genre:"精神"},
+  {q:"週2回以上、人と笑って会話する機会がありますか？", correct:true, genre:"精神"},
+  {q:"物事がうまくいかないと自分を責め過ぎる傾向がありますか？", correct:false, genre:"精神"},
+  {q:"自分の価値観に基づいて人生の選択をしていますか？", correct:true, genre:"精神"},
+  {q:"毎日、その日の良かったことを3つ思い出す習慣がありますか？", correct:true, genre:"精神"},
+  {q:"些細なことで極端に落ち込むことが多いですか？", correct:false, genre:"精神"},
+  {q:"困難な状況でもユーモアを見つけることができますか？", correct:true, genre:"精神"},
+  {q:"自分の感情を第三者的に観察できる（メタ認知）能力がありますか？", correct:true, genre:"精神"},
+  {q:"嫉妬心が強く、他人の成功が素直に喜べないことが多いですか？", correct:false, genre:"精神"},
+  {q:"月1回以上、旧友や家族に連絡を取っていますか？", correct:true, genre:"精神"},
+  {q:"変化や不確実性に対して柔軟に対応できますか？", correct:true, genre:"精神"},
+
+  // 環境 追加33問
+  {q:"自宅の寝室に遮光カーテンを使用していますか？", correct:true, genre:"環境"},
+  {q:"PM2.5など大気汚染の情報を確認して外出を調整しますか？", correct:true, genre:"環境"},
+  {q:"職場でスタンディングデスクや ergonomic チェアを使っていますか？", correct:true, genre:"環境"},
+  {q:"住居近くに工場や幹線道路からの排気ガスがありますか？", correct:false, genre:"環境"},
+  {q:"水道水を一度沸騰させてから飲む習慣がありますか？", correct:true, genre:"環境"},
+  {q:"自宅に空気清浄機を設置して使用していますか？", correct:true, genre:"環境"},
+  {q:"職場や自宅に観葉植物を置いていますか？", correct:true, genre:"環境"},
+  {q:"月2回以上、自宅の寝具（枕・シーツ等）を洗濯していますか？", correct:true, genre:"環境"},
+  {q:"有害な洗剤や化学薬品の代わりに天然素材のものを使っていますか？", correct:true, genre:"環境"},
+  {q:"騒音の多い環境での長時間作業時、耳栓を使用しますか？", correct:true, genre:"環境"},
+  {q:"日当たりが悪く、1日中薄暗い環境で過ごすことが多いですか？", correct:false, genre:"環境"},
+  {q:"職場に信頼できる上司や相談できる同僚がいますか？", correct:true, genre:"環境"},
+  {q:"週末に必ず自宅からの外出・外の空気を吸っていますか？", correct:true, genre:"環境"},
+  {q:"ゴミの分別やリサイクルを意識して生活していますか？", correct:true, genre:"環境"},
+  {q:"自宅や職場でのブルーライト対策（フィルター等）をしていますか？", correct:true, genre:"環境"},
+  {q:"深夜に強い光（スマホ・照明）を浴びることが多いですか？", correct:false, genre:"環境"},
+  {q:"近所に緊急時に頼れる人がいますか？", correct:true, genre:"環境"},
+  {q:"自宅の水回り（カビ・水漏れ等）のメンテナンスをしていますか？", correct:true, genre:"環境"},
+  {q:"職場の換気が不十分でこもった空気の中にいることが多いですか？", correct:false, genre:"環境"},
+  {q:"職場のパソコン作業時に定期的に目を休めていますか？", correct:true, genre:"環境"},
+  {q:"自宅周辺の治安が良いと感じていますか？", correct:true, genre:"環境"},
+  {q:"部屋の温度が極端に暑い・寒い状態が続くことがありますか？", correct:false, genre:"環境"},
+  {q:"自宅近くに医療機関・薬局が徒歩圏内にありますか？", correct:true, genre:"環境"},
+  {q:"職場で長時間座る際に定期的な姿勢チェックをしていますか？", correct:true, genre:"環境"},
+  {q:"自宅の食器や調理器具を定期的に衛生管理していますか？", correct:true, genre:"環境"},
+  {q:"月1回以上、近くの自然（川・海・山・公園）を訪れていますか？", correct:true, genre:"環境"},
+  {q:"職場で昼休みに外に出て気分転換をしていますか？", correct:true, genre:"環境"},
+  {q:"自宅のガス・電気・水道の安全点検を定期的にしていますか？", correct:true, genre:"環境"},
+  {q:"窓を開けて自然の光と風を取り入れる習慣がありますか？", correct:true, genre:"環境"},
+  {q:"虫除けや殺虫剤を室内で頻繁に使用していますか？", correct:false, genre:"環境"},
+  {q:"自宅に防音対策をして良質な睡眠環境を確保していますか？", correct:true, genre:"環境"},
+  {q:"仕事の繁忙期でも自宅での休息環境を維持できていますか？", correct:true, genre:"環境"},
+  {q:"週1回以上、知人や家族と直接会って話す機会がありますか？", correct:true, genre:"環境"},
+
+  // 技術 追加33問
+  {q:"コレステロール・中性脂肪の数値を直近1年以内に確認しましたか？", correct:true, genre:"技術"},
+  {q:"自分の適正睡眠時間を把握して実践していますか？", correct:true, genre:"技術"},
+  {q:"週1回以上、健康関連の新しい情報を学んでいますか？", correct:true, genre:"技術"},
+  {q:"自分の体型に合った正しい靴を選んでいますか？", correct:true, genre:"技術"},
+  {q:"医師から処方された薬を自己判断で中断したことがありますか？", correct:false, genre:"技術"},
+  {q:"腸活のために食物繊維とプロバイオティクスの違いを知っていますか？", correct:true, genre:"技術"},
+  {q:"熱中症の予防と対処法を正しく知っていますか？", correct:true, genre:"技術"},
+  {q:"自分のかかりやすい疾患の初期症状を把握していますか？", correct:true, genre:"技術"},
+  {q:"健康食品やサプリを医師に相談せず大量に服用していますか？", correct:false, genre:"技術"},
+  {q:"骨粗鬆症予防のためのカルシウムとビタミンDの関係を知っていますか？", correct:true, genre:"技術"},
+  {q:"腰痛予防のための正しい持ち上げ方（膝を曲げる等）を実践していますか？", correct:true, genre:"技術"},
+  {q:"皮膚がんリスクを避けるため紫外線対策を日常的にしていますか？", correct:true, genre:"技術"},
+  {q:"自分のメンタルヘルス状態を客観的に評価できますか？", correct:true, genre:"技術"},
+  {q:"禁煙補助薬（ニコチンパッチ・禁煙外来等）の存在を知っていますか？", correct:true, genre:"技術"},
+  {q:"体重管理にカロリー計算アプリを活用したことがありますか？", correct:true, genre:"技術"},
+  {q:"正しい手の洗い方（30秒・指の間まで）を実践していますか？", correct:true, genre:"技術"},
+  {q:"自分の血液型とRhの情報を把握していますか？", correct:true, genre:"技術"},
+  {q:"睡眠時無呼吸症候群のリスクを把握・検査したことがありますか？", correct:true, genre:"技術"},
+  {q:"正しいブラッシングと歯間ケアを毎日実践していますか？", correct:true, genre:"技術"},
+  {q:"熱が38度を超えた時の適切な対処法を知っていますか？", correct:true, genre:"技術"},
+  {q:"食物アレルギーの発症時の対処法（エピペン等）を知っていますか？", correct:true, genre:"技術"},
+  {q:"自分に合ったストレス解消法を複数持っていますか？", correct:true, genre:"技術"},
+  {q:"インターネットで自己診断して医師の受診を避けることがありますか？", correct:false, genre:"技術"},
+  {q:"免疫力を高める生活習慣（睡眠・栄養・運動）を総合的に実践していますか？", correct:true, genre:"技術"},
+  {q:"脱水症状の初期サイン（口渇・濃い尿等）を認識できますか？", correct:true, genre:"技術"},
+  {q:"家族の医療情報（アレルギー・持病・服薬）を把握していますか？", correct:true, genre:"技術"},
+  {q:"薬の飲み忘れを防ぐための工夫（アラーム・ピルケース等）をしていますか？", correct:true, genre:"技術"},
+  {q:"自分の適正な栄養素摂取量（PFCバランス）を知っていますか？", correct:true, genre:"技術"},
+  {q:"メンタルヘルス不調時の早期サインを自覚できますか？", correct:true, genre:"技術"},
+  {q:"運動中の適切な心拍数ゾーン（有酸素運動帯）を知っていますか？", correct:true, genre:"技術"},
+  {q:"健康に関する情報を複数の信頼できる情報源で確認していますか？", correct:true, genre:"技術"},
+  {q:"災害時の医薬品・処方薬の備蓄ができていますか？", correct:true, genre:"技術"},
+  {q:"過去の健康診断結果を保管・管理していますか？", correct:true, genre:"技術"},
+
+  // 運 追加34問
+  {q:"生まれた時に健康な体で生まれてきましたか？", correct:true, genre:"運"},
+  {q:"大きな自然災害（地震・洪水等）で深刻な被害を受けたことがありますか？", correct:false, genre:"運"},
+  {q:"深刻な事故や怪我から奇跡的に回復した経験がありますか？", correct:true, genre:"運"},
+  {q:"医療が充実した国・地域で生まれ育ちましたか？", correct:true, genre:"運"},
+  {q:"良い師匠・メンターに恵まれた経験がありますか？", correct:true, genre:"運"},
+  {q:"人生で予期しない幸運な出来事が複数回ありましたか？", correct:true, genre:"運"},
+  {q:"健康面での大きな失敗から立ち直った経験が力になっていますか？", correct:true, genre:"運"},
+  {q:"食中毒や感染症で入院した経験が最近5年以内にありますか？", correct:false, genre:"運"},
+  {q:"運動・食事など良い習慣を自然に形成できる環境に育ちましたか？", correct:true, genre:"運"},
+  {q:"仕事上で健康を害するような強制や圧力を受けたことがありますか？", correct:false, genre:"運"},
+  {q:"人生の転機となるような良い出会いがありましたか？", correct:true, genre:"運"},
+  {q:"遺伝的に体が丈夫で病気になりにくい体質だと思いますか？", correct:true, genre:"運"},
+  {q:"過去に重大な経済的危機に陥ったことがありますか？", correct:false, genre:"運"},
+  {q:"健康を取り戻した経験が現在の生活習慣に良い影響を与えていますか？", correct:true, genre:"運"},
+  {q:"危機的状況で助けてくれる人が常にいると感じますか？", correct:true, genre:"運"},
+  {q:"自分の人生で何度か流れが変わる『転換点』がありましたか？", correct:true, genre:"運"},
+  {q:"過去の苦労や試練が今の自分を強くしたと感じますか？", correct:true, genre:"運"},
+  {q:"長期にわたる深刻な職場のハラスメントを経験しましたか？", correct:false, genre:"運"},
+  {q:"人生のタイミングが良く、チャンスを掴めたことがありますか？", correct:true, genre:"運"},
+  {q:"先天性の疾患や障害なく健康に生まれてきましたか？", correct:true, genre:"運"},
+  {q:"これまでの人生で重篤な精神疾患（統合失調症等）にかかったことがありますか？", correct:false, genre:"運"},
+  {q:"健康管理をサポートしてくれるパートナーや家族がいますか？", correct:true, genre:"運"},
+  {q:"職場環境が体力・精神力を蝕むほど過酷だったことがありますか？", correct:false, genre:"運"},
+  {q:"幸運な偶然の一致（セレンディピティ）を体験したことがありますか？", correct:true, genre:"運"},
+  {q:"自分の健康に関する直感が正しかった経験が多いですか？", correct:true, genre:"運"},
+  {q:"人生で培ってきた人脈が健康面でも支えになっていますか？", correct:true, genre:"運"},
+  {q:"加齢に伴う変化に上手く適応できていると感じますか？", correct:true, genre:"運"},
+  {q:"予期しない病気の早期発見が検診で見つかった経験がありますか？", correct:true, genre:"運"},
+  {q:"悪運に見舞われても立ち直れたことで自信がついていますか？", correct:true, genre:"運"},
+  {q:"自分は平均より健康に恵まれている方だと感じますか？", correct:true, genre:"運"},
+  {q:"子どもの頃に受けた教育が今の健康習慣に良い影響を与えていますか？", correct:true, genre:"運"},
+  {q:"長い人生の中で大切な人を早くに失う経験が多かったですか？", correct:false, genre:"運"},
+  {q:"これまでの人生を振り返ると概ね恵まれていたと感じますか？", correct:true, genre:"運"},
+  {q:"これからも健康でいられるという強い予感がありますか？", correct:true, genre:"運"},
+];
+
+/* ═══════════════════════════════════════════════════
+   GAME STATE
+═══════════════════════════════════════════════════ */
+let state = {
+  name:'', dob:null, gender:'male',
+  baseDays:0, currentDays:0, maxDays:0,
+  questions:[], qIndex:0, totalQ:40,
+  timer:5, timerInterval:null,
+  results:[], // {correct:bool, fast:bool, genre:str}
+};
+
+/* ── SCREENS ── */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+/* ── DOB SELECTS ── */
+function initDOB(){
+  const y = document.getElementById('dob-y');
+  const m = document.getElementById('dob-m');
+  const d = document.getElementById('dob-d');
+  const now = new Date();
+  for(let yr=now.getFullYear()-100; yr<=now.getFullYear()-10; yr++){
+    const o = document.createElement('option');
+    o.value=yr; o.textContent=yr+'年';
+    if(yr===now.getFullYear()-35) o.selected=true;
+    y.appendChild(o);
+  }
+  ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'].forEach((mn,i)=>{
+    const o=document.createElement('option'); o.value=i+1; o.textContent=mn; m.appendChild(o);
+  });
+  for(let dd=1;dd<=31;dd++){
+    const o=document.createElement('option'); o.value=dd; o.textContent=dd+'日'; d.appendChild(o);
+  }
+}
+initDOB();
+
+/* ── CALCULATE BASE LIFESPAN ── */
+function calcBaseDays(dob, gender){
+  const avgYears = gender==='female' ? 87.1 : 81.1;
+  const deathDate = new Date(dob);
+  deathDate.setFullYear(deathDate.getFullYear() + avgYears);
+  const diff = deathDate - new Date();
+  return Math.max(0, Math.floor(diff / 86400000));
+}
+
+/* ── START GAME ── */
+function startGame(){
+  const y = parseInt(document.getElementById('dob-y').value);
+  const m = parseInt(document.getElementById('dob-m').value);
+  const d = parseInt(document.getElementById('dob-d').value);
+  state.dob = new Date(y,m-1,d);
+  state.gender = document.getElementById('gender').value;
+  state.name = document.getElementById('name-input').value.trim() || '診断者';
+  state.totalQ = parseInt(document.getElementById('q-count').value);
+  state.baseDays = calcBaseDays(state.dob, state.gender);
+  state.currentDays = state.baseDays;
+  state.maxDays = state.baseDays;
+  state.qIndex = 0;
+  state.results = [];
+
+  // shuffle & pick
+  const shuffled = [...QUESTIONS].sort(()=>Math.random()-.5);
+  state.questions = shuffled.slice(0, state.totalQ);
+
+  // build progress dots
+  const pr = document.getElementById('progress-row');
+  pr.innerHTML='';
+  const show = Math.min(state.totalQ, 30);
+  for(let i=0;i<show;i++){
+    const dot=document.createElement('div');
+    dot.className='progress-dot';
+    dot.id='dot-'+i;
+    pr.appendChild(dot);
+  }
+
+  showScreen('game');
+  playGameStart();
+  startHeartbeat(1);
+  updateLifeDisplay();
+  setTimeout(()=>loadQuestion(), 500);
+}
+
+/* ── UPDATE LIFE BAR ── */
+function updateLifeDisplay(){
+  const pct = Math.max(0, state.currentDays / state.maxDays);
+  const bar = document.getElementById('life-bar');
+  bar.style.width = (pct*100).toFixed(1)+'%';
+  if(pct > .5) bar.style.background='var(--green)';
+  else if(pct > .25) bar.style.background='var(--amber)';
+  else bar.style.background='var(--red)';
+  document.getElementById('life-pct').textContent=(pct*100).toFixed(0)+'%';
+  const d = Math.max(0, Math.round(state.currentDays));
+  document.getElementById('life-days-display').textContent = d.toLocaleString('ja-JP');
+  heartRate = 0.3 + pct * 1.4;
+  startHeartbeat(heartRate);
+}
+
+/* ── LOAD QUESTION ── */
+function loadQuestion(){
+  if(state.qIndex >= state.totalQ){ endGame(); return; }
+  const q = state.questions[state.qIndex];
+  document.getElementById('question-text').textContent = q.q;
+  document.getElementById('q-num').textContent = 'Q'+(state.qIndex+1)+' / '+state.totalQ;
+  const badge = document.getElementById('genre-badge');
+  badge.textContent = q.genre;
+  badge.className = 'genre-badge genre-'+q.genre;
+
+  // update current dot
+  const dot = document.getElementById('dot-'+state.qIndex);
+  if(dot) dot.className='progress-dot current';
+
+  // enable buttons
+  document.getElementById('btn-yes').disabled=false;
+  document.getElementById('btn-no').disabled=false;
+
+  startTimer();
+}
+
+/* ── TIMER ── */
+function startTimer(){
+  clearInterval(state.timerInterval);
+  state.timer = 5.0;
+  updateTimer();
+  state.timerInterval = setInterval(()=>{
+    state.timer -= 0.1;
+    if(state.timer <= 2.5) playTick();
+    if(state.timer <= 0){
+      clearInterval(state.timerInterval);
+      onTimeout();
+    } else {
+      updateTimer();
+    }
+  }, 100);
+}
+function updateTimer(){
+  const pct = Math.max(0, state.timer / 5);
+  const fill = document.getElementById('timer-fill');
+  fill.style.width = (pct*100).toFixed(0)+'%';
+  if(pct > .5) fill.style.background='var(--green)';
+  else if(pct > .25) fill.style.background='var(--amber)';
+  else fill.style.background='var(--red)';
+  document.getElementById('timer-sec').textContent = Math.max(0,state.timer).toFixed(1)+'s';
+}
+
+function onTimeout(){
+  playTimeout();
+  const q = state.questions[state.qIndex];
+  // タイムアウトは小さなペナルティ
+  const penalty = Math.floor(state.maxDays * 0.008);
+  state.currentDays -= penalty;
+  state.results.push({correct:false, fast:false, genre:q.genre, timeout:true});
+  flashFeedback('TIME OUT', 'timeout');
+  updateDot(state.qIndex,'skip');
+  updateLifeDisplay();
+  nextQuestion();
+}
+
+/* ── ANSWER ── */
+function answer(isYes){
+  clearInterval(state.timerInterval);
+  document.getElementById('btn-yes').disabled=true;
+  document.getElementById('btn-no').disabled=true;
+
+  const q = state.questions[state.qIndex];
+  const correct = (isYes === q.correct);
+  const timeLeft = state.timer;
+  const speedBonus = timeLeft / 5;
+
+  if(correct){
+    const gain = Math.floor(state.maxDays * (0.004 + speedBonus * 0.006));
+    state.currentDays += gain;
+    state.currentDays = Math.min(state.currentDays, state.maxDays * 1.05);
+    playGood();
+    flashFeedback('+' + gain.toLocaleString('ja-JP') + '日', 'good');
+    updateDot(state.qIndex,'good');
+    state.results.push({correct:true, fast:timeLeft>3.5, genre:q.genre});
+  } else {
+    const loss = Math.floor(state.maxDays * (0.012 + (1-speedBonus)*0.01));
+    state.currentDays -= loss;
+    state.currentDays = Math.max(0, state.currentDays);
+    playBad();
+    flashFeedback('-' + loss.toLocaleString('ja-JP') + '日', 'bad');
+    updateDot(state.qIndex,'bad');
+    state.results.push({correct:false, fast:false, genre:q.genre});
+  }
+  updateLifeDisplay();
+  nextQuestion();
+}
+
+function updateDot(i, type){
+  const dot=document.getElementById('dot-'+i);
+  if(dot) dot.className='progress-dot done-'+type;
+}
+
+function nextQuestion(){
+  state.qIndex++;
+  setTimeout(loadQuestion, 900);
+}
+
+/* ── FEEDBACK ── */
+function flashFeedback(msg, type){
+  const el=document.getElementById('feedback');
+  el.textContent=msg;
+  el.className='feedback '+type+' show';
+  setTimeout(()=>el.classList.remove('show'), 700);
+}
+
+/* ── END GAME ── */
+function endGame(){
+  clearInterval(state.timerInterval);
+  stopHeartbeat();
+  playGameEnd();
+
+  const days = Math.max(0, Math.round(state.currentDays));
+  const years = (days/365.25).toFixed(1);
+  const correct = state.results.filter(r=>r.correct).length;
+  const wrong = state.results.filter(r=>!r.correct&&!r.timeout).length;
+  const timeouts = state.results.filter(r=>r.timeout).length;
+  const fastCorrect = state.results.filter(r=>r.correct&&r.fast).length;
+
+  // genre scores
+  const genres = ['食事','体力','精神','環境','技術','運'];
+  const genreScores = {};
+  genres.forEach(g=>{
+    const gq = state.results.filter(r=>r.genre===g);
+    genreScores[g] = gq.length>0 ? (gq.filter(r=>r.correct).length/gq.length*100).toFixed(0) : '—';
+  });
+
+  document.getElementById('result-name').textContent = state.name;
+  document.getElementById('result-days').textContent = days.toLocaleString('ja-JP');
+  document.getElementById('result-years').textContent = '約 ' + years + ' 年';
+
+  // stats
+  const statsEl = document.getElementById('result-stats');
+  statsEl.innerHTML = `
+    <div class="stat-cell"><div class="stat-val">${correct}</div><div class="stat-lbl">正解数</div></div>
+    <div class="stat-cell"><div class="stat-val">${wrong}</div><div class="stat-lbl">誤答数</div></div>
+    <div class="stat-cell"><div class="stat-val">${fastCorrect}</div><div class="stat-lbl">速答ボーナス</div></div>
+    <div class="stat-cell"><div class="stat-val">${timeouts}</div><div class="stat-lbl">タイムアウト</div></div>
+  `;
+
+  // message
+  const pct = days / state.maxDays;
+  let msg = '';
+  if(pct >= 1.02) msg = `【延命】素晴らしい生活習慣です。あなたの日々の積み重ねが、命の時計を少し長く刻んでいます。このまま続けてください。`;
+  else if(pct >= 0.9) msg = `【良好】概ね健康的な生活が維持できています。いくつかの改善点を意識することで、さらに命の質を高められるでしょう。`;
+  else if(pct >= 0.75) msg = `【注意】生活習慣に改善の余地があります。今日から少しずつ変えることで、残された時間はまだ取り戻せます。`;
+  else if(pct >= 0.5) msg = `【危険】生命に影響する習慣が見受けられます。医師への相談と生活の見直しを、今すぐ始めることをお勧めします。`;
+  else msg = `【緊急】深刻な状況が示唆されています。今すぐ生活習慣の根本的な変革が必要です。一人で抱え込まず、専門家の力を借りてください。`;
+
+  // genre breakdown
+  msg += '\n\n【ジャンル別スコア】\n';
+  genres.forEach(g=>{ msg += `${g}: ${genreScores[g]}%　`; });
+
+  document.getElementById('result-msg').textContent = msg;
+  showScreen('result');
+
+  // flash life indicator
+  setTimeout(()=>{
+    if(pct<0.5){ document.getElementById('result-days').style.color='var(--red)'; }
+    else if(pct<0.75){ document.getElementById('result-days').style.color='var(--amber)'; }
+  }, 200);
+}
+
+function restart(){
+  stopHeartbeat();
+  showScreen('title');
+}
+
+/* ═══════════════════════════════════════════════════
+   専門家コメント DB（質問文をキーにマッピング）
+═══════════════════════════════════════════════════ */
+const EXPERT_COMMENTS = {
+  // 食事
+  "毎日3食を規則正しく食べていますか？": {
+    yes:"規則的な3食は血糖値を安定させ、代謝リズムを整えます。食事の時間を固定することは、内臓時計を正常に機能させる上で非常に重要です。",
+    no:"食事を抜いたり不規則になると血糖値が乱高下し、過食や脂肪蓄積につながります。まず朝食から始めることを医師はすすめています。"
+  },
+  "野菜を毎日1日350g以上食べていますか？": {
+    yes:"厚生労働省が推奨する350g以上の野菜摂取は、がん・心疾患・糖尿病リスクを有意に下げることが多くの研究で示されています。",
+    no:"野菜不足は慢性炎症の一因です。まずは1食あたりの半分を野菜にする「ハーフ野菜プレート」から始めると達成しやすくなります。"
+  },
+  "朝食を毎日食べていますか？": {
+    yes:"朝食は脳のブドウ糖を補給し、午前中の集中力・代謝を高めます。また肥満リスクを下げる効果も疫学的に確認されています。",
+    no:"朝食抜きは昼食の過食を招き、インスリン抵抗性を高める可能性があります。忙しい朝でもバナナ1本＋牛乳が最低限の対策になります。"
+  },
+  "加工食品や即席食品を週4回以上食べますか？": {
+    yes:"加工食品は塩分・トランス脂肪・添加物が多く、週4回以上の摂取は心血管疾患リスクを約12%高めるという研究があります。減らす努力を。",
+    no:"加工食品の抑制は塩分・添加物摂取を自然に減らし、血圧や腸内環境の改善に直結します。この習慣を続けてください。"
+  },
+  "塩分を1日6g未満に抑えていますか？": {
+    yes:"日本人の平均塩分摂取量は約10gとされる中、6g未満は高血圧・脳卒中予防に極めて有効です。薄味習慣は命を守ります。",
+    no:"塩分過多は高血圧の最大要因であり、脳卒中・心疾患・腎臓病に直結します。だしや酸味（レモン・酢）で塩を代替する工夫を試みてください。"
+  },
+  "毎日果物を食べていますか？": {
+    yes:"果物に含まれるビタミンC・カリウム・食物繊維・抗酸化物質は、老化を遅らせ免疫機能を維持します。1日200gを目安に続けましょう。",
+    no:"果物不足はビタミンCや抗酸化物質の摂取低下につながります。ただし果糖の過剰摂取にも注意が必要で、1日200g程度が適量です。"
+  },
+  "週2回以上魚を食べていますか？": {
+    yes:"魚のオメガ3脂肪酸（EPA・DHA）は心血管疾患リスクを約30%低下させ、脳の認知機能維持にも不可欠です。特に青魚を意識して摂りましょう。",
+    no:"魚の摂取不足はオメガ3脂肪酸が不足し、慢性炎症や動脈硬化のリスクを高めます。週2回の魚食は心臓病死亡率を有意に下げることが示されています。"
+  },
+  "清涼飲料水を毎日500ml以上飲んでいますか？": {
+    yes:"清涼飲料水500ml中には角砂糖約10個分の糖分が含まれます。毎日の摂取は2型糖尿病リスクを26%高めるとする研究があります。水か緑茶に切り替えましょう。",
+    no:"清涼飲料水の制限は糖尿病・肥満・虫歯予防に非常に効果的です。水や無糖のお茶を積極的に選んでいるあなたの習慣は、長期的に大きな差を生みます。"
+  },
+  "水を1日1.5リットル以上飲んでいますか？": {
+    yes:"適切な水分補給は腎機能保護・血液循環改善・体温調節に不可欠です。尿路結石の予防にも有効で、内臓への負担を大幅に軽減します。",
+    no:"慢性的な水分不足は腎臓への負担を増やし、尿路結石・高血圧・便秘のリスクを高めます。食事以外に1.5リットルを目標に意識的な水分補給を。"
+  },
+  "揚げ物を週3回以上食べていますか？": {
+    yes:"揚げ物の高脂質・高カロリーは動脈硬化・肥満・2型糖尿病の主要因です。週3回以上の習慣は心血管疾患死亡リスクを有意に高めるという研究があります。",
+    no:"揚げ物を控えることで、トランス脂肪・酸化油脂の摂取を減らせます。焼く・蒸す・煮るの調理法を選べていることは心臓と血管に優しい習慣です。"
+  },
+  "赤肉（牛・豚）を週4回以上食べますか？": {
+    yes:"WHOは赤肉の過剰摂取を大腸がんの確実なリスク因子と分類しています。週4回以上は飽和脂肪酸過多にもなりやすく、魚や豆類との置き換えを推奨します。",
+    no:"赤肉を適度に控えることは大腸がん・心血管疾患リスクの低減につながります。植物性タンパク質や魚を中心とした食生活はWHOが推奨するパターンです。"
+  },
+  "食事中によく噛んで食べていますか？": {
+    yes:"よく噛むことで消化が助けられ、満腹感を得やすくなり過食を防ぎます。唾液アミラーゼによる消化促進・口腔ガン予防にも効果があります。1口30回が理想です。",
+    no:"早食いは満腹中枢への信号が遅れ過食になりやすく、肥満・血糖スパイクの原因になります。一口ごとに箸を置く習慣が改善への第一歩です。"
+  },
+  "夜10時以降に食事をすることが多いですか？": {
+    yes:"深夜の食事は消化器官の休息を妨げ、脂肪蓄積を促すBMAL1（時計遺伝子）が活性化する時間帯です。最低でも就寝3時間前には食事を終えるよう心がけましょう。",
+    no:"夜遅い食事を避けることは内臓脂肪の蓄積を防ぎ、睡眠の質向上にも大きく貢献します。概日リズムを守る食事タイミングは長寿との強い相関が示されています。"
+  },
+  "食物繊維を毎日意識して摂っていますか？": {
+    yes:"食物繊維は腸内細菌のエサとなり、免疫機能・炎症抑制・血糖値安定に寄与します。大腸がんリスクを最大40%低下させるという大規模研究があります。",
+    no:"日本人の食物繊維摂取量は推奨値を大幅に下回っています。玄米・豆類・海藻を加えるだけで摂取量を格段に増やせます。腸の健康は全身の健康の鍵です。"
+  },
+  "乳製品を毎日摂取していますか？": {
+    yes:"乳製品のカルシウム・ビタミンD・乳酸菌は骨粗鬆症予防・腸内環境改善・免疫強化に役立ちます。特に女性は閉経後の骨密度維持に重要です。",
+    no:"乳製品不足はカルシウム摂取が不足しがちです。骨粗鬆症は無症状のまま進行します。豆腐・小魚・ブロッコリーなど他のカルシウム源で補うことが重要です。"
+  },
+  "食事のカロリーを気にして食べていますか？": {
+    yes:"カロリー意識は肥満予防・生活習慣病防止に基本的かつ有効なアプローチです。ただし質（栄養素バランス）も同様に重要であることを忘れずに。",
+    no:"カロリーを全く気にしない食生活は肥満リスクと直結します。スマートフォンアプリを使った食事記録は意識改革の第一歩として非常に有効です。"
+  },
+  "早食いの習慣がありますか？": {
+    yes:"早食いは脳の満腹シグナルが来る前（食後約20分）に過食してしまう原因です。血糖値の急上昇も招き、インスリン抵抗性・2型糖尿病リスクを高めます。",
+    no:"ゆっくり食べる習慣は過食防止・血糖値安定・消化促進に直結します。この習慣だけで体重が自然に減ったという研究報告もあります。"
+  },
+  "間食が1日2回以上ありますか？": {
+    yes:"頻繁な間食は血糖値の継続的な上昇を招き、インスリンを過剰分泌させます。脂肪蓄積・虫歯・食欲中枢の乱れにもつながります。間食は1回・200kcal以内が目安です。",
+    no:"間食を適度に抑えることは血糖コントロールと体重管理に有効です。必要なら低GI食品（ナッツ・ヨーグルト）を少量摂ることは問題ありません。"
+  },
+  "発酵食品（納豆・ヨーグルト等）を週3回以上食べますか？": {
+    yes:"発酵食品の乳酸菌・ビフィズス菌・納豆菌は腸内フローラを多様化し、免疫機能・抗炎症作用・メンタルヘルスにまで影響します。腸脳相関の観点からも非常に重要です。",
+    no:"腸内環境の多様性は健康長寿の鍵です。週3回の発酵食品習慣から始め、少しずつ種類を増やしていくことで腸内細菌の質が向上します。"
+  },
+  "食事を抜くことが週2回以上ありますか？": {
+    yes:"食事抜きは筋肉を分解してエネルギーを補い、基礎代謝を低下させます。次の食事での過食・血糖スパイク・集中力低下を招く悪循環に陥りやすいです。",
+    no:"規則的な食事は代謝リズムを安定させ、筋肉量の維持に貢献します。この当たり前に見える習慣が長期的な健康の礎になっています。"
+  },
+  "食事のバランスを毎食意識していますか？": {
+    yes:"主食・主菜・副菜のバランスを意識することは、ビタミン・ミネラル・タンパク質の過不足を防ぐ最も実践的な方法です。この習慣は糖尿病予防の基本中の基本です。",
+    no:"食事バランスの崩れは特定栄養素の過不足を生み、慢性病の下地を作ります。「一汁三菜」の和食スタイルは最もバランスが良いモデルとして世界的にも評価されています。"
+  },
+  "外食の頻度は週5回以上ですか？": {
+    yes:"外食は塩分・脂質・カロリーが家庭食の1.5〜2倍になりやすく、栄養バランスも偏りがちです。外食時はサラダや汁物を追加するなどの工夫が健康維持に有効です。",
+    no:"外食を適度に抑えることは塩分・脂質過多の防止に効果的です。自炊頻度が高いほど栄養管理のコントロールが自分に委ねられます。"
+  },
+  "豆腐や大豆製品を週3回以上食べますか？": {
+    yes:"大豆イソフラボン・植物性タンパク・食物繊維は動脈硬化・骨粗鬆症・ホルモン関連疾患の予防に有効です。特に更年期以降の女性に大きなメリットがあります。",
+    no:"大豆製品は最も優れた植物性タンパク源のひとつです。納豆・豆腐・みそ汁を日常に加えるだけで、大きな栄養的改善が期待できます。"
+  },
+  "アルコールを毎日飲みますか？": {
+    yes:"毎日の飲酒は肝臓へのダメージを蓄積させ、肝硬変・肝がんリスクを著しく高めます。また脳萎縮・認知症・高血圧・依存症の主因でもあります。週2日の休肝日を設けることが最低限の対策です。",
+    no:"毎日飲まない習慣は肝臓・脳・心臓を守ります。適量（男性2単位/日以下）であっても飲まない日を設けることが内臓保護に重要です。"
+  },
+  "コレステロールの高い食品を意識して控えていますか？": {
+    yes:"LDLコレステロールの管理は動脈硬化・心筋梗塞・脳梗塞の一次予防として最も重要な食事戦略です。卵・内臓・バターの過剰摂取に継続して注意してください。",
+    no:"食事由来のコレステロールが全体の約20〜30%を占めます。特に飽和脂肪酸の摂取量がLDLを左右します。食品成分表を確認する習慣を身につけましょう。"
+  },
+  "砂糖の摂取を意識して減らしていますか？": {
+    yes:"砂糖の過剰摂取は肥満・2型糖尿病・心血管疾患の独立したリスク因子です。意識して減らしている習慣は、長期的な代謝健康に大きく貢献します。",
+    no:"WHO推奨の砂糖摂取量は総エネルギーの10%未満（約50g/日）です。加工食品に隠れた砂糖（果糖ぶどう糖液糖）に特に注意が必要です。"
+  },
+  "朝食はパンだけ、または菓子類だけですか？": {
+    yes:"精製された炭水化物だけの朝食は血糖値を急激に上昇させた後、急低下させます。午前中の集中力低下・過食につながるため、タンパク質と組み合わせることが推奨されます。",
+    no:"バランスの良い朝食を選んでいることは、一日の血糖値コントロールと集中力維持に非常に効果的です。良い習慣を維持してください。"
+  },
+  "スナック菓子を毎日食べていますか？": {
+    yes:"スナック菓子は高脂質・高塩分・高カロリーで栄養価がほぼゼロです。毎日の習慣は肥満・高血圧・慢性炎症の原因となります。ナッツや果物への代替を検討してください。",
+    no:"スナック菓子を日常的に避けていることは、空カロリー・過剰塩分・トランス脂肪の摂取を防いでいます。代わりに何を食べているかも健康に影響します。"
+  },
+  "週に1回以上、自炊していますか？": {
+    yes:"自炊は食材・調理法・塩分量を自分でコントロールできる最善の方法です。自炊頻度が高い人は体重・血圧・血糖値が安定しているという調査結果があります。",
+    no:"外食・中食が中心の食生活は塩分・脂質・カロリーが管理困難になります。週1回からでも自炊を始め、少しずつ頻度を上げることを医師は推奨しています。"
+  },
+  "食後すぐ横になる習慣がありますか？": {
+    yes:"食後すぐの就寝は胃食道逆流症（逆流性食道炎）の主要リスク因子です。また血糖値が高い状態での睡眠は脂肪蓄積を促します。食後30分は座位または軽歩行を推奨します。",
+    no:"食後に横にならない習慣は胃食道逆流・脂肪蓄積防止に有効です。食後に軽く歩くことで血糖値の上昇を抑える効果も期待できます。"
+  },
+  "鉄分・カルシウム・亜鉛を意識して摂っていますか？": {
+    yes:"ミクロ栄養素（鉄・カルシウム・亜鉛）は免疫機能・骨密度・酵素活性に不可欠です。特に女性は月経による鉄損失を補う意識が重要です。",
+    no:"現代人に不足しがちなミネラルは骨・免疫・神経機能に影響します。サプリメントより食品からの摂取が吸収率・安全性の観点から推奨されています。"
+  },
+  // 体力
+  "週3回以上、30分以上の有酸素運動をしていますか？": {
+    yes:"週150分以上の中強度有酸素運動はWHOが推奨する基準です。心血管疾患・2型糖尿病・特定のがんリスクを最大35%低下させるエビデンスがあります。",
+    no:"有酸素運動不足は現代の最大の健康リスクのひとつです。週3回30分のウォーキングから始めるだけで、死亡リスクが有意に低下することが示されています。"
+  },
+  "毎日1万歩以上歩いていますか？": {
+    yes:"1日1万歩は脂肪燃焼・心肺機能強化・血圧降下に効果的です。ただし最新の研究では7,000〜8,000歩でも十分な健康効果があることも示されています。",
+    no:"歩行数が少ないと筋力低下・循環器疾患リスクが高まります。まず1日5,000歩を目標に、電車の一駅手前で降りるなど日常に歩く機会を組み込みましょう。"
+  },
+  "週2回以上筋力トレーニングをしていますか？": {
+    yes:"筋力トレーニングは筋肉量の維持・基礎代謝向上・骨密度増加・転倒予防に直結します。40代以降は加齢による筋肉量低下（サルコペニア）対策として特に重要です。",
+    no:"筋力低下は糖尿病・骨折・認知症の独立したリスク因子です。週2回の筋トレは最低限の推奨量で、自体重のスクワット・プッシュアップから始めることができます。"
+  },
+  "1日8時間以上座りっぱなしですか？": {
+    yes:"長時間の座位行動は『座りすぎ病』とも呼ばれ、運動習慣があっても死亡リスクを高めます。30分ごとに立ち上がり2〜3分の歩行を挟むことが推奨されています。",
+    no:"長時間座らないことは慢性疾患リスクの低減に直結します。スタンディングデスクの利用や定期的な立ち歩きがさらに効果を高めます。"
+  },
+  "エレベーターよりも階段を選ぶことが多いですか？": {
+    yes:"階段の利用は下肢筋力強化・心肺機能向上に効果的な生活活動です。1日10分の階段昇降は約70kcalを消費し、継続することで心血管疾患リスクを下げます。",
+    no:"エレベーター利用は身体活動の機会を逃しています。階段を選ぶだけで1日の活動量が大きく変わります。小さな選択の積み重ねが長期的な健康を作ります。"
+  },
+  "体重を定期的に測定していますか？": {
+    yes:"毎日同じ時間の体重測定は肥満の早期発見・食事管理のフィードバックとして非常に有効です。自分の体の変化に気づけることが健康管理の第一歩です。",
+    no:"体重測定を怠ると肥満の進行に気づきにくくなります。朝起きてトイレ後・空腹時に測定する習慣をつけることを強くお勧めします。"
+  },
+  "BMIが18.5〜24.9の範囲内ですか？": {
+    yes:"標準BMIの維持は多くの慢性疾患リスクを適正水準に保ちます。ただしBMIは筋肉量と脂肪量を区別しないため、体脂肪率も参考にすることを推奨します。",
+    no:"BMIが標準範囲外の場合、糖尿病・高血圧・関節疾患・特定のがんリスクが高まります。まず5〜10%の体重減少が最も大きな健康改善効果をもたらします。"
+  },
+  "運動後にストレッチをしていますか？": {
+    yes:"運動後のストレッチは筋肉の疲労回復・柔軟性維持・怪我予防に効果的です。特に静的ストレッチは副交感神経を優位にし、心身のクールダウンを促します。",
+    no:"ストレッチなしの運動終了は筋肉の硬直・疲労物質の蓄積を招き、翌日のパフォーマンスと怪我リスクに影響します。5分でも行う習慣をつけましょう。"
+  },
+  "慢性的な疲労感がありますか？": {
+    yes:"慢性疲労は睡眠障害・貧血・甲状腺機能低下・うつ病など多くの疾患のサインである可能性があります。自己判断せず、内科・心療内科への受診をお勧めします。",
+    no:"慢性疲労がないことは、身体的・精神的健康が維持されているサインです。疲れた時は無理せず回復に専念することが長期的なパフォーマンス維持の鍵です。"
+  },
+  "体力に自信がありますか？": {
+    yes:"体力への自信は運動習慣の継続動機となり、精神的健康にも良い影響を与えます。自己効力感と健康寿命には強い正の相関があります。",
+    no:"体力低下を感じたら、まず原因を特定することが重要です。急激な低下は疾患の可能性も考えられます。かかりつけ医への相談を検討してください。"
+  },
+  // 精神
+  "毎日7〜8時間の睡眠が取れていますか？": {
+    yes:"7〜8時間の睡眠はNHKが推奨する理想的な時間です。この睡眠時間帯では記憶の固定・免疫機能の修復・代謝調節が最も効率よく行われます。",
+    no:"6時間以下の睡眠が続くと認知機能低下・肥満・心疾患・免疫低下のリスクが著しく上昇します。睡眠負債は週末だけでは完全に回復できません。"
+  },
+  "慢性的なストレスを感じていますか？": {
+    yes:"慢性ストレスはコルチゾールを持続的に高め、免疫抑制・脳の海馬萎縮・動脈硬化・うつ病のリスクを高めます。専門家によるストレスマネジメントの導入を検討してください。",
+    no:"ストレスが少ない状態は免疫機能・認知機能・心血管健康の維持に直結します。ただし完全なストレスゼロは逆に意欲低下を招くこともあり、適度な緊張は必要です。"
+  },
+  "人生に前向きな目標がありますか？": {
+    yes:"目的意識（Ikigai）の存在は死亡リスクを最大15%低下させるという日本の大規模研究があります。生きがいは免疫機能・ストレス耐性・社会的絆を強化します。",
+    no:"目標や生きがいの欠如は抑うつ・無気力・免疫低下と関連します。小さな目標（今月読む本1冊など）から始め、意欲の種を育てることが健康寿命を延ばします。"
+  },
+  "趣味や好きなことに時間を使えていますか？": {
+    yes:"趣味に使う時間はストレスホルモンを低下させ、ドーパミン・セロトニン分泌を促します。趣味のある人は心疾患・認知症リスクが低いという研究が複数あります。",
+    no:"趣味の時間が持てないほど多忙な生活は、精神的燃え尽き症候群（バーンアウト）のサインかもしれません。週1時間でも自分の好きなことへの投資が必要です。"
+  },
+  "信頼できる友人や家族がいますか？": {
+    yes:"社会的つながりの強さは喫煙・肥満・運動不足と並ぶ健康の独立因子です。ハーバード大学の75年間の追跡研究でも、良好な人間関係が長寿と最も相関していました。",
+    no:"社会的孤立は喫煙と同等の死亡リスクを持つという研究があります。コミュニティへの参加や既存の関係の再構築を積極的に行うことを強く推奨します。"
+  },
+  "毎日感謝できることを意識していますか？": {
+    yes:"感謝の実践は副交感神経を活性化し、睡眠の質・免疫機能・主観的幸福感を高めます。就寝前に3つの感謝を書くジャーナリングは科学的に効果が実証されています。",
+    no:"感謝を意識しない習慣は否定的な思考パターンを強化しやすくなります。感謝の気持ちを育てることは幸福感だけでなく、身体的健康指標の改善にもつながります。"
+  },
+  "自分の感情をコントロールできていますか？": {
+    yes:"感情調節能力は精神的健康の核心であり、対人関係・仕事のパフォーマンス・ストレス耐性に直結します。この能力は訓練によって向上させることができます。",
+    no:"感情のコントロールが難しい場合、認知行動療法（CBT）や感情調節スキルトレーニングが効果的です。専門家への相談が改善への近道となります。"
+  },
+  "孤独を強く感じることが多いですか？": {
+    yes:"孤独感の慢性化は炎症反応を高め、心血管疾患・認知症・うつ病リスクを著しく増加させます。地域のサークル活動・ボランティアへの参加が有効な対策です。",
+    no:"孤独を感じない環境にあることは精神的・身体的健康の基盤です。人とのつながりを大切に維持することを継続してください。"
+  },
+  "笑うことが1日1回以上ありますか？": {
+    yes:"笑いはNK細胞（ナチュラルキラー細胞）を活性化し免疫を高め、エンドルフィン分泌により痛みを和らげます。大阪の研究では笑いの頻度が高い人ほど心疾患リスクが低いことが示されています。",
+    no:"笑いの機会が少ない生活は免疫機能・精神健康に影響します。お気に入りのコメディや友人との会話など、意識して笑える状況を作ることが大切です。"
+  },
+  "不安感が日常的に強いですか？": {
+    yes:"日常的な強い不安は全般性不安障害の可能性があります。放置すると心身症・免疫低下・睡眠障害に発展します。精神科・心療内科への早期受診を検討してください。",
+    no:"不安感をうまく管理できていることは心身の健康を守る重要な能力です。定期的なマインドフルネスの実践がさらなる精神的安定に寄与します。"
+  },
+  // 環境
+  "タバコを吸っていますか（自分）？": {
+    yes:"喫煙は肺がん・心筋梗塞・脳卒中・COPD（慢性閉塞性肺疾患）の最大リスク因子です。禁煙から10〜15年で非喫煙者に近いレベルまでリスクが低下します。禁煙外来の活用を強く推奨します。",
+    no:"非喫煙であることは肺・心臓・血管・脳のリスクを根本的に下げています。日本人の喫煙による死亡者数は年間約13万人とされており、最も重要な健康習慣のひとつです。"
+  },
+  "受動喫煙にさらされる環境にいますか？": {
+    yes:"受動喫煙は吸煙者と同様のリスクを多くの疾患でもたらします。特に子どもと妊婦への影響は深刻です。職場や家庭の禁煙化を求めることを躊躇わないでください。",
+    no:"受動喫煙のない環境にいることは肺がん・心血管疾患リスクを有意に下げます。この環境を守り続けることが重要です。"
+  },
+  "定期的に健康診断を受けていますか？": {
+    yes:"定期的な健康診断は生活習慣病・がんの早期発見に不可欠です。発見が1年早まるだけで、多くのがんで生存率が大幅に改善します。この習慣を必ず続けてください。",
+    no:"健康診断を受けないことは、無症状のまま進行する高血圧・糖尿病・がんを見逃すリスクを高めます。年1回の受診は最低限の自己管理として強く推奨されます。"
+  },
+  "職場の人間関係は良好ですか？": {
+    yes:"良好な職場環境はストレスホルモンを抑制し、仕事へのエンゲージメントと免疫機能を高めます。職場のサポート体制は心筋梗塞・うつ病リスクと強く相関します。",
+    no:"職場のストレスが慢性化すると燃え尽き症候群・抑うつ・心血管疾患のリスクが高まります。上司や産業医への相談、転職も含めた環境改善の検討をお勧めします。"
+  },
+  "自宅が整理整頓されていますか？": {
+    yes:"整頓された環境はコルチゾール（ストレスホルモン）を低下させ、集中力・睡眠の質を向上させます。物理的な空間の秩序は精神的な安定とも深く結びついています。",
+    no:"散らかった環境は慢性的なストレスの原因となり、集中力低下・睡眠障害と関連するという研究があります。5分の片付けから始める習慣化が効果的です。"
+  },
+  "日常的に自然（公園・緑）に触れていますか？": {
+    yes:"自然との接触は交感神経を鎮め、コルチゾールを低下させます。週2時間以上の自然体験が健康的な精神状態と関連するという大規模研究があります。",
+    no:"都市化した環境への完全適応は難しく、自然不足は精神的健康に影響します。週末の公園散歩や観葉植物の設置からでも自然との接点を作ることをお勧めします。"
+  },
+  "通勤時間が片道1時間以上かかりますか？": {
+    yes:"長時間通勤はストレスホルモンを高め、睡眠時間の削減・運動不足・食事の乱れをもたらします。幸福感への負の影響は収入低下に匹敵するという研究もあります。",
+    no:"通勤時間が短いことは睡眠時間の確保・ストレス低減・生活の質向上に直結します。この環境優位を最大限に活かした生活設計が可能です。"
+  },
+  "経済的な安定を感じていますか？": {
+    yes:"経済的安定は医療アクセス・食事の質・住環境・精神的安定の基盤となります。健康格差の研究では経済状況が健康寿命に大きく影響することが示されています。",
+    no:"経済的不安は慢性ストレスの主要原因のひとつです。ファイナンシャルプランナーへの相談や社会保障制度の活用など、利用できるリソースを探すことも重要な自己管理です。"
+  },
+  // 技術
+  "かかりつけ医や主治医がいますか？": {
+    yes:"かかりつけ医の存在は疾患の早期発見・継続的な健康管理・緊急時の迅速な対応を可能にします。医師との長期的な信頼関係は医療の質を大幅に高めます。",
+    no:"かかりつけ医がいない場合、症状が出てから初診をとる必要があり診断が遅れます。近くの内科・家庭医学科でかかりつけを作ることを早急にお勧めします。"
+  },
+  "年1回以上の健康診断を受けていますか？": {
+    yes:"年1回の健康診断は生活習慣病の早期発見・経年変化の把握に不可欠です。結果を医師と共有し、数値の変化をフォローする体制を整えましょう。",
+    no:"健康診断の未受診は無症状疾患の見逃しリスクを高めます。日本では事業主健診が義務付けられており、未受診の場合は会社・自治体の健診を積極的に利用してください。"
+  },
+  "応急処置（AED・心肺蘇生）ができますか？": {
+    yes:"AEDと心肺蘇生を習得していることは、身近な人の命を救える可能性を大きく高めます。心停止後4分以内の蘇生は脳へのダメージを防ぐ重要な時間です。",
+    no:"日本では毎年約7万人が院外心停止を起こします。AED・CPRの習得は市区町村の講習（無料）で1〜2時間で得られ、誰かの命を救う最も直接的なスキルです。"
+  },
+  "自分の血圧を定期的に測定していますか？": {
+    yes:"家庭血圧の定期測定は高血圧の早期発見・治療効果の確認に最も有効な方法です。朝起きてすぐと夕食後の2回測定が標準的な方法として推奨されています。",
+    no:"高血圧は『サイレントキラー』と呼ばれ無症状のまま進行します。脳卒中・心筋梗塞の最大リスク因子であり、家庭用血圧計（3000円台〜）での自己管理開始を強く推奨します。"
+  },
+  "がん検診を定期的に受けていますか？": {
+    yes:"定期的ながん検診は5大がん（胃・肺・大腸・乳・子宮頸）の早期発見を可能にし、ステージ1での発見率を大幅に高めます。早期発見は治療の選択肢と生存率を劇的に改善します。",
+    no:"日本人の2人に1人ががんに罹患する時代です。がん検診受診率は先進国中最低水準にあります。市区町村が提供する各種がん検診（無料〜低コスト）の積極的な活用を強く勧めます。"
+  },
+  "予防接種（インフルエンザ等）を毎年受けていますか？": {
+    yes:"インフルエンザワクチンは重症化・入院・死亡リスクを有意に低減します。高齢者・基礎疾患のある方にとっては特に重要な予防医療です。",
+    no:"インフルエンザは毎年約1万人の死亡関連者を出す感染症です。ワクチン接種は自分への感染予防だけでなく、周囲の高リスク者を守る社会的責任でもあります。"
+  },
+  "感染症予防（手洗い・マスク等）を正しく行っていますか？": {
+    yes:"正しい手洗い（30秒以上・石鹸使用）は感染症の約60〜80%を予防できます。最も費用対効果が高い予防医療として世界中の医師が推奨しています。",
+    no:"感染症予防の基本的な習慣の欠如は、インフルエンザ・ノロウイルス・肺炎などのリスクを高めます。特に高齢者・免疫低下者との接触前の手洗いは社会的礼儀でもあります。"
+  },
+  "自分の遺伝的リスクを把握していますか？": {
+    yes:"遺伝的リスクの把握は、該当する疾患のスクリーニング頻度を高め、予防的生活習慣の優先順位を設定するのに役立ちます。家族歴を医師に正確に伝えることが重要です。",
+    no:"家族性高コレステロール血症・遺伝性乳がん・糖尿病など、遺伝的リスクが高い疾患は知っておくことで予防策を取れます。家族の病歴を整理し医師に相談しましょう。"
+  },
+  "インターネットの健康情報を批判的に見ていますか？": {
+    yes:"医療情報リテラシーは誤情報による不適切な自己治療を防ぎます。信頼できる情報源（学会・厚労省・PubMed）を参照する習慣は現代に不可欠な健康スキルです。",
+    no:"インターネット上の健康情報の多くは科学的根拠が乏しいか誤りを含みます。サプリメント・代替療法の過信・適切な医療の遅延につながりやすく、医師への確認習慣が重要です。"
+  },
+  "心臓発作の兆候を知っていますか？": {
+    yes:"心筋梗塞の典型症状（胸痛・左肩への放散・冷や汗・吐き気）を知っていれば、救急要請を迷わずできます。発症から治療開始までの時間が心筋ダメージを決定します。",
+    no:"心臓発作の症状は多様で非典型的（腹痛・顎の痛み・疲労感のみ）なこともあります。特に糖尿病・高齢者では無症状型もあります。日本心臓財団のサイトで学ぶことをお勧めします。"
+  },
+  // 運
+  "長寿の家系ですか（両親・祖父母が長生き）？": {
+    yes:"長寿遺伝子の存在は寿命に約25%寄与するとされます。ただしこれは習慣の影響（75%）の方が大きいことを意味します。遺伝的優位を生活習慣でさらに活かせます。",
+    no:"家族に短命者がいる場合、遺伝的リスクに対してより積極的な予防医療と生活習慣管理が重要です。遺伝は運命ではなく、傾向を知ることで対策を打てます。"
+  },
+  "危険なスポーツや活動を定期的にしていますか？": {
+    yes:"スカイダイビング・バイクレース・格闘技などの危険なスポーツは外傷・急性心停止・慢性障害リスクを高めます。適切な安全装備の使用と体調管理が不可欠です。",
+    no:"リスクの高い活動を避けることは急性外傷・事故死のリスク低減に直結します。安全な範囲での身体活動は積極的に推奨されます。"
+  },
+  "普段から安全運転を心がけていますか？": {
+    yes:"安全運転の実践は交通事故死・重傷リスクを最も直接的に下げます。日本の交通事故死者数は年間約2,600人で、40代以下では事故が死因の上位を占めます。",
+    no:"安全運転への意識を高めることは命に直結します。スマートフォン操作・速度超過・飲酒運転は死亡事故の主要原因です。運転習慣の見直しを強く推奨します。"
+  },
+  "経済的に安定した生活ができていますか？": {
+    yes:"経済的安定は医療へのアクセス・食生活の質・住環境・ストレス軽減を通じて健康寿命に直接寄与します。この安定を維持する金融リテラシーも健康管理の一部です。",
+    no:"経済的困窮は食事・医療・住環境の質を低下させ、慢性ストレスを高めます。利用可能な社会保障サービス・給付金を積極的に調べ活用することをお勧めします。"
+  },
+  "重大な病気（がん・心疾患等）の家族歴がありますか？": {
+    yes:"家族性の疾患リスクを持つ場合、通常より早い年齢から・高頻度での検診が推奨されます。かかりつけ医にリスク管理プランの相談を行うことが重要です。",
+    no:"家族歴に重大疾患が少ないことは遺伝的リスクの低さを示唆します。ただし生活習慣の影響は遺伝を上回ることも多く、引き続き予防的な生活を維持することが大切です。"
+  },
+  "自分は運が良い方だと思いますか？": {
+    yes:"楽観性と自己効力感は免疫機能を高め、ストレス回復力を向上させます。『運が良い』と感じている人はチャンスを見逃さず行動できるという心理学的根拠もあります。",
+    no:"悲観的な自己認識は慢性ストレス・抑うつリスクを高めます。認知的再フレーミング（出来事のプラス面に意識を向ける訓練）は心理療法として効果が実証されています。"
+  },
+  "自分の未来を楽観的に考えられますか？": {
+    yes:"楽観主義者は悲観主義者と比べて心血管疾患死亡リスクが30%低く、平均寿命が7〜10年長いという研究があります。前向きな思考は身体的健康に直接影響します。",
+    no:"将来への悲観は行動変容のモチベーションを奪い、健康行動の継続を妨げます。小さな成功体験の積み重ねが楽観性を育てる最も効果的な方法です。"
+  },
+  "生きることへの強い意欲がありますか？": {
+    yes:"生存意欲（Will to live）は免疫機能・回復力・痛みへの耐性に直接影響することが医学的に示されています。この意欲が命を延ばす最大の内的要因のひとつです。",
+    no:"生きる意欲の低下は、身体的疾患・うつ病・睡眠障害などのサインである可能性があります。心療内科・精神科への受診を強くお勧めします。一人で抱え込まないでください。"
+  },
+  "人生にまだやりたいことがたくさんありますか？": {
+    yes:"未来への展望とやりたいことの存在は、生存意欲・免疫機能・回復力を高めます。目標達成への期待は脳の報酬系を活性化し、身心の活力を維持します。",
+    no:"やりたいことが見つからない場合、好奇心を刺激する新しい体験に踏み出すことが有効です。コミュニティ参加・学習・旅行が新たな目標発見のきっかけになることが多いです。"
+  },
+};
+
+/* デフォルトコメント（質問が未登録の場合） */
+function getComment(question, userSaidYes, correctIsYes){
+  const entry = EXPERT_COMMENTS[question];
+  if(!entry){
+    if(userSaidYes === correctIsYes){
+      return "正しい選択です。この習慣を維持することが健康寿命の延伸に貢献します。";
+    } else {
+      return "この習慣の改善が健康リスクの低減につながります。かかりつけ医や専門家に相談することをお勧めします。";
+    }
+  }
+  return userSaidYes ? entry.yes : entry.no;
+}
+
+/* ── REVIEW ── */
+let reviewFilter = 'all';
+let reviewData = [];
+
+function showReview(){
+  // build review data
+  reviewData = state.questions.map((q,i)=>{
+    const r = state.results[i] || {correct:false, timeout:true, genre:q.genre};
+    const userSaidYes = r.timeout ? null : (r.correct === q.correct ? q.correct : !q.correct);
+    // recompute: userSaidYes XOR correct→ wrong means user said opposite
+    // simpler: if r.correct, user matched q.correct. if wrong, user said opposite
+    const userAnswered = r.timeout ? null : (r.correct ? q.correct : !q.correct);
+    return {
+      q, idx:i+1,
+      userAnswered,
+      timeout: r.timeout||false,
+      correct: r.correct,
+      comment: r.timeout
+        ? "時間内に答えられませんでした。"+getComment(q.q, q.correct, q.correct)
+        : getComment(q.q, userAnswered, q.correct)
+    };
+  });
+  renderReview();
+  showScreen('review');
+}
+
+function filterReview(f, btn){
+  reviewFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderReview();
+}
+
+const genreColors = {
+  '食事':'#ffaa00','体力':'#00ff88','精神':'#b464ff',
+  '環境':'#00c8ff','技術':'#ffc800','運':'#ff5050'
+};
+const genreBg = {
+  '食事':'rgba(255,170,0,.1)','体力':'rgba(0,255,136,.1)','精神':'rgba(180,100,255,.1)',
+  '環境':'rgba(0,200,255,.1)','技術':'rgba(255,200,0,.1)','運':'rgba(255,80,80,.1)'
+};
+
+function renderReview(){
+  const list = document.getElementById('review-list');
+  let items = reviewData;
+  if(reviewFilter === 'correct') items = items.filter(i=>i.correct);
+  else if(reviewFilter === 'wrong') items = items.filter(i=>!i.correct && !i.timeout);
+  else if(reviewFilter === 'timeout') items = items.filter(i=>i.timeout);
+  else if(['食事','体力','精神','環境','技術','運'].includes(reviewFilter)){
+    items = items.filter(i=>i.q.genre===reviewFilter);
+  }
+
+  if(items.length===0){
+    list.innerHTML='<div style="text-align:center;color:var(--muted);padding:2rem;font-family:\'Share Tech Mono\',monospace;font-size:.8rem;">該当する回答はありません</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(item=>{
+    const cls = item.timeout ? 'timeout' : (item.correct ? 'correct' : 'wrong');
+    const verdictCls = item.timeout ? 'verdict-timeout' : (item.correct ? 'verdict-correct' : 'verdict-wrong');
+    const verdictText = item.timeout ? '時間切れ' : (item.correct ? '正解' : '誤答');
+    const userAns = item.timeout ? '—' : (item.userAnswered ? 'はい' : 'いいえ');
+    const correctAns = item.q.correct ? 'はい' : 'いいえ';
+    const gc = genreColors[item.q.genre]||'#888';
+    const gb = genreBg[item.q.genre]||'rgba(128,128,128,.1)';
+    return `<div class="review-card ${cls}">
+      <div class="review-card-head">
+        <span class="review-qnum">Q${item.idx}</span>
+        <span class="review-verdict ${verdictCls}">${verdictText}</span>
+        <span class="review-genre-tag" style="background:${gb};color:${gc};border:1px solid ${gc}40">${item.q.genre}</span>
+      </div>
+      <div class="review-q-text">${item.q.q}</div>
+      <div class="review-answer-row">
+        <span class="your-ans">あなた: <span>${userAns}</span></span>
+        <span style="color:var(--muted);opacity:.4">｜</span>
+        <span class="correct-ans">正解: <span>${correctAns}</span></span>
+      </div>
+      <div class="review-comment">${item.comment}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── KEYBOARD ── */
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('screen-game').classList.contains('active')){
+    if(e.key==='ArrowLeft') answer(true);
+    if(e.key==='ArrowRight') answer(false);
+  }
+});
+
+/* ── SWIPE ── */
+let touchStartX=0;
+document.addEventListener('touchstart', e=>{ touchStartX=e.touches[0].clientX; },{passive:true});
+document.addEventListener('touchend', e=>{
+  if(!document.getElementById('screen-game').classList.contains('active')) return;
+  const dx=e.changedTouches[0].clientX - touchStartX;
+  if(Math.abs(dx)>60){
+    if(dx>0) answer(true);
+    else answer(false);
+  }
+},{passive:true});
+</script>
+</body>
+</html>
