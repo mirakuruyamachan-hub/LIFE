@@ -46,7 +46,7 @@
   }
 
   /* ── SCREENS ── */
-  .screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:2rem 1.5rem; }
+  .screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:2rem 1.5rem; width:100%; }
   .screen.active { display:flex; }
 
   /* ── TITLE ── */
@@ -85,28 +85,38 @@
   }
 
   /* ── INPUT SCREEN ── */
-  #screen-input { gap:1.5rem; max-width:400px; width:100%; }
+  #screen-input {
+    gap:1.8rem;
+    max-width:480px;
+    width:100%;
+    align-items:center;
+    text-align:center;
+    margin-left:auto;
+    margin-right:auto;
+  }
 
   .section-label {
     font-family:'Share Tech Mono', monospace;
-    font-size:.7rem;
+    font-size:.85rem;
     letter-spacing:.25em;
     color: var(--green-dim);
     text-transform:uppercase;
+    text-align:center;
+    width:100%;
   }
 
-  .input-group { display:flex; flex-direction:column; gap:.5rem; width:100%; }
+  .input-group { display:flex; flex-direction:column; gap:.7rem; width:100%; align-items:center; }
 
-  .dob-row { display:flex; gap:.5rem; align-items:center; }
+  .dob-row { display:flex; gap:.6rem; align-items:center; width:100%; }
 
   .dob-row select {
     flex:1;
     background: var(--bg2);
     color: var(--text);
     border: 1px solid rgba(0,255,136,.3);
-    padding:.7rem .5rem;
+    padding:.9rem .5rem;
     font-family:'Share Tech Mono', monospace;
-    font-size:.9rem;
+    font-size:1rem;
     border-radius:4px;
     appearance:none;
     -webkit-appearance:none;
@@ -120,11 +130,12 @@
     background: var(--bg2);
     color: var(--text);
     border: 1px solid rgba(0,255,136,.3);
-    padding:.8rem 1rem;
+    padding:1rem 1.2rem;
     font-family:'Share Tech Mono', monospace;
-    font-size:.9rem;
+    font-size:1rem;
     border-radius:4px;
     letter-spacing:.1em;
+    text-align:center;
   }
   .name-input:focus { outline: 1px solid var(--green); }
   .name-input::placeholder { color: var(--muted); }
@@ -308,36 +319,167 @@
   .progress-dot.done-skip  { background: var(--amber); opacity:.7; }
   .progress-dot.current    { background: var(--green); opacity:1; box-shadow: 0 0 6px var(--green); }
 
-  /* ── RESULT SCREEN ── */
-  #screen-result { gap:1.2rem; max-width:420px; width:100%; text-align:center; }
-
-  .result-header {
-    font-family:'Share Tech Mono', monospace;
-    font-size:.7rem;
-    letter-spacing:.3em;
-    color: var(--muted);
+  /* ── CERTIFICATE ── */
+  #screen-result {
+    gap:.8rem;
+    padding:70px 1rem 2rem;
+    justify-content:flex-start;
+    align-items:center;
   }
 
-  .result-name {
-    font-size:1.3rem;
+  .cert-wrap {
+    width:100%;
+    max-width:480px;
+    margin:0 auto;
+    background: var(--bg2);
+    border:1px solid rgba(0,255,136,.3);
+    border-radius:6px;
+    padding:1.4rem 1.2rem;
+    position:relative;
+    box-shadow: 0 0 30px rgba(0,255,136,.05), inset 0 0 60px rgba(0,0,0,.3);
+  }
+  .cert-wrap::before {
+    content:'';
+    position:absolute;
+    inset:6px;
+    border:1px solid rgba(0,255,136,.08);
+    border-radius:4px;
+    pointer-events:none;
+  }
+
+  .cert-header { text-align:center; margin-bottom:1rem; }
+  .cert-title-en {
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(.55rem, 2.5vw, .75rem);
+    letter-spacing:.25em;
+    color: var(--muted);
+  }
+  .cert-title-ja {
+    font-size:clamp(1.1rem, 5vw, 1.6rem);
     font-weight:700;
-    color: var(--text);
+    color: var(--green);
+    letter-spacing:.3em;
+    text-shadow: 0 0 20px rgba(0,255,136,.3);
+    margin:.2rem 0;
+  }
+  .cert-serial {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.65rem;
+    color: var(--muted);
     letter-spacing:.1em;
   }
 
-  .result-days {
-    font-family:'Share Tech Mono', monospace;
-    font-size:clamp(3rem, 18vw, 5.5rem);
-    color: var(--green);
-    line-height:1;
-    text-shadow: 0 0 60px rgba(0,255,136,.5);
+  .cert-stamp-row {
+    display:flex; justify-content:space-between;
+    margin-bottom:.8rem; gap:.5rem; flex-wrap:wrap;
   }
-  .result-days-label { font-size:.75rem; letter-spacing:.3em; color: var(--muted); }
+  .cert-issued { display:flex; flex-direction:column; gap:.1rem; }
 
-  .result-years {
+  .cert-divider {
+    border:none;
+    border-top:1px solid rgba(0,255,136,.12);
+    margin:.8rem 0;
+  }
+
+  .cert-section-title {
     font-family:'Share Tech Mono', monospace;
-    font-size:1.1rem;
+    font-size:.68rem;
+    letter-spacing:.2em;
     color: var(--green-dim);
+    margin-bottom:.5rem;
+  }
+
+  .cert-label {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.65rem;
+    color: var(--muted);
+    letter-spacing:.1em;
+    min-width:5rem;
+    display:inline-block;
+  }
+  .cert-value {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.9rem;
+    color: var(--text);
+  }
+  .cert-unit {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.75rem;
+    color: var(--muted);
+    margin-left:.3rem;
+  }
+
+  .cert-row {
+    display:flex;
+    align-items:baseline;
+    gap:.5rem;
+    margin-bottom:.4rem;
+  }
+
+  .cert-name-big {
+    font-size:clamp(1.1rem, 5vw, 1.5rem) !important;
+    font-weight:700;
+    color: var(--text) !important;
+    letter-spacing:.1em;
+  }
+
+  .cert-days {
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(1.4rem, 7vw, 2rem) !important;
+    color: var(--green) !important;
+    text-shadow: 0 0 20px rgba(0,255,136,.4);
+  }
+
+  .cert-death-date-box {
+    text-align:center;
+    padding:.8rem;
+    background: rgba(0,0,0,.2);
+    border-radius:4px;
+    border:1px solid rgba(0,255,136,.15);
+  }
+  .cert-death-date {
+    font-family:'Share Tech Mono', monospace;
+    font-size:clamp(1.2rem, 6vw, 1.8rem);
+    color: var(--green);
+    text-shadow: 0 0 20px rgba(0,255,136,.4);
+    letter-spacing:.05em;
+  }
+  .cert-death-sub {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.75rem;
+    color: var(--muted);
+    margin-top:.3rem;
+    display:flex;
+    justify-content:center;
+    gap:1rem;
+  }
+
+  .cert-footer {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:.5rem;
+  }
+  .cert-doctor { display:flex; flex-direction:column; gap:.2rem; }
+
+  .cert-hanko {
+    width:52px; height:52px;
+    border:2px solid var(--red);
+    border-radius:4px;
+    color: var(--red);
+    font-family:'Noto Sans JP', sans-serif;
+    font-size:.7rem;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    line-height:1.4;
+    letter-spacing:.05em;
+    box-shadow: 0 0 8px rgba(255,51,68,.2);
+    opacity:.85;
+    transform: rotate(-8deg);
+    flex-shrink:0;
   }
 
   .result-stats {
@@ -515,13 +657,13 @@
 
 <!-- ══ INPUT SCREEN ══ -->
 <div class="screen" id="screen-input">
-  <div class="section-label">患者情報の入力</div>
+  <div class="section-label" style="font-size:1rem;margin-bottom:.5rem">— 患者情報の入力 —</div>
   <div class="input-group">
-    <div class="section-label" style="font-size:.65rem">氏名 (任意)</div>
+    <div class="section-label">氏名 (任意)</div>
     <input class="name-input" id="name-input" type="text" placeholder="例: 山田 太郎" maxlength="20">
   </div>
   <div class="input-group">
-    <div class="section-label" style="font-size:.65rem">生年月日</div>
+    <div class="section-label">生年月日</div>
     <div class="dob-row">
       <select id="dob-y" style="flex:1.4"></select>
       <select id="dob-m"></select>
@@ -529,7 +671,7 @@
     </div>
   </div>
   <div class="input-group">
-    <div class="section-label" style="font-size:.65rem">性別</div>
+    <div class="section-label">性別</div>
     <div class="dob-row">
       <select id="gender" style="flex:1">
         <option value="male">男性</option>
@@ -539,7 +681,7 @@
     </div>
   </div>
   <div class="input-group">
-    <div class="section-label" style="font-size:.65rem">診断問題数</div>
+    <div class="section-label">診断問題数</div>
     <div class="dob-row">
       <select id="q-count" style="flex:1">
         <option value="20">20問（短め）</option>
@@ -548,7 +690,7 @@
       </select>
     </div>
   </div>
-  <button class="btn-main" onclick="startGame()">[ 診断開始 ]</button>
+  <button class="btn-main" onclick="startGame()" style="font-size:1.1rem;padding:1.1rem">[ 診断開始 ]</button>
   <button class="btn-retry" onclick="showScreen('title')">← 戻る</button>
 </div>
 
@@ -584,14 +726,91 @@
 
 <!-- ══ RESULT SCREEN ══ -->
 <div class="screen" id="screen-result">
-  <div class="result-header">— 診断結果 —</div>
-  <div class="result-name" id="result-name">山田 太郎</div>
-  <div class="result-days" id="result-days">12,450</div>
-  <div class="result-days-label">DAYS TO LIVE</div>
-  <div class="result-years" id="result-years">約 34.1 年</div>
-  <div class="result-stats" id="result-stats"></div>
-  <div class="result-msg" id="result-msg"></div>
-  <button class="btn-print" onclick="showReview()">[ 回答レビューを見る ]</button>
+
+  <!-- 診断書ヘッダー -->
+  <div class="cert-wrap">
+    <div class="cert-header">
+      <div class="cert-title-en">FUTURE DEATH CERTIFICATE</div>
+      <div class="cert-title-ja">未 来 死 亡 診 断 書</div>
+      <div class="cert-serial" id="cert-serial">No. 000000</div>
+    </div>
+
+    <div class="cert-stamp-row">
+      <div class="cert-issued">
+        <span class="cert-label">発行機関</span>
+        <span class="cert-value">LIFE 余命診断システム</span>
+      </div>
+      <div class="cert-issued">
+        <span class="cert-label">発行日</span>
+        <span class="cert-value" id="cert-issue-date">—</span>
+      </div>
+    </div>
+
+    <div class="cert-divider"></div>
+
+    <!-- 被診断者情報 -->
+    <div class="cert-section-title">▌ 被診断者</div>
+    <div class="cert-row">
+      <span class="cert-label">氏　名</span>
+      <span class="cert-value cert-name-big" id="result-name">—</span>
+    </div>
+    <div class="cert-row">
+      <span class="cert-label">現在年齢</span>
+      <span class="cert-value" id="cert-current-age">—</span>
+    </div>
+
+    <div class="cert-divider"></div>
+
+    <!-- 診断結果 -->
+    <div class="cert-section-title">▌ 診断結果</div>
+    <div class="cert-row">
+      <span class="cert-label">余命日数</span>
+      <span class="cert-value cert-days" id="result-days">—</span>
+      <span class="cert-unit">日</span>
+    </div>
+    <div class="cert-row">
+      <span class="cert-label">余命期間</span>
+      <span class="cert-value" id="result-years">—</span>
+    </div>
+
+    <div class="cert-divider"></div>
+
+    <!-- 予定命日 -->
+    <div class="cert-section-title">▌ 予定命日</div>
+    <div class="cert-death-date-box">
+      <div class="cert-death-date" id="death-date-str">----年--月--日</div>
+      <div class="cert-death-sub">
+        <span id="death-weekday"></span>
+        <span id="death-age-str"></span>
+      </div>
+    </div>
+
+    <div class="cert-divider"></div>
+
+    <!-- スコア -->
+    <div class="cert-section-title">▌ 生活習慣スコア</div>
+    <div class="result-stats" id="result-stats"></div>
+
+    <div class="cert-divider"></div>
+
+    <!-- 所見 -->
+    <div class="cert-section-title">▌ 医師所見</div>
+    <div class="result-msg" id="result-msg"></div>
+
+    <div class="cert-divider"></div>
+
+    <!-- 印鑑エリア -->
+    <div class="cert-footer">
+      <div class="cert-doctor">
+        <span class="cert-label">担当診断AI</span>
+        <span class="cert-value">LIFE System Ver.2.0</span>
+      </div>
+      <div class="cert-hanko" id="cert-hanko">診<br>断<br>済</div>
+    </div>
+
+  </div><!-- /cert-wrap -->
+
+  <button class="btn-print" onclick="showReview()" style="margin-top:1rem">[ 回答レビューを見る ]</button>
   <button class="btn-retry" onclick="restart()">← もう一度診断する</button>
 </div>
 
@@ -1493,6 +1712,45 @@ function endGame(){
   document.getElementById('result-name').textContent = state.name;
   document.getElementById('result-days').textContent = days.toLocaleString('ja-JP');
   document.getElementById('result-years').textContent = '約 ' + years + ' 年';
+
+  // 発行日
+  const now2 = new Date();
+  document.getElementById('cert-issue-date').textContent =
+    `${now2.getFullYear()}年${now2.getMonth()+1}月${now2.getDate()}日`;
+
+  // シリアル番号（ランダム6桁）
+  document.getElementById('cert-serial').textContent =
+    'No. ' + String(Math.floor(Math.random()*999999)).padStart(6,'0');
+
+  // 予定命日を計算
+  const deathDate = new Date();
+  deathDate.setDate(deathDate.getDate() + days);
+  const dy = deathDate.getFullYear();
+  const dm = deathDate.getMonth() + 1;
+  const dd = deathDate.getDate();
+  const weekdays = ['日','月','火','水','木','金','土'];
+  const dw = weekdays[deathDate.getDay()];
+
+  // 死亡時の年齢（享年）を計算
+  const birthY = state.dob.getFullYear();
+  const birthM = state.dob.getMonth();
+  const birthD = state.dob.getDate();
+  let deathAge = dy - birthY;
+  if(deathDate.getMonth() < birthM || (deathDate.getMonth() === birthM && deathDate.getDate() < birthD)){
+    deathAge--;
+  }
+
+  // 現在の年齢を計算
+  const nowAge = new Date();
+  let currentAge = nowAge.getFullYear() - birthY;
+  if(nowAge.getMonth() < birthM || (nowAge.getMonth() === birthM && nowAge.getDate() < birthD)){
+    currentAge--;
+  }
+
+  document.getElementById('cert-current-age').textContent = `${currentAge} 歳`;
+  document.getElementById('death-date-str').textContent = `${dy}年 ${dm}月 ${dd}日`;
+  document.getElementById('death-weekday').textContent = `${dw}曜日`;
+  document.getElementById('death-age-str').textContent = `享年 ${deathAge} 歳`;
 
   // stats
   const statsEl = document.getElementById('result-stats');
