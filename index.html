@@ -15,9 +15,11 @@
     --amber: #ffaa00;
     --bg: #020c06;
     --bg2: #041a0d;
-    --text: #c0f0d0;
-    --muted: #406050;
+    --text: #ffffff;
+    --muted: #aaccbb;
   }
+
+  html { font-size: 18px; }
 
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -28,6 +30,7 @@
     min-height: 100vh;
     overflow-x: hidden;
     user-select: none;
+    font-size: 1rem;
   }
 
   /* ── SCANLINES ── */
@@ -74,13 +77,13 @@
   }
 
   .title-desc {
-    font-size:.85rem;
+    font-size:.95rem;
     color: var(--muted);
     line-height:1.8;
-    max-width:320px;
+    max-width:400px;
     text-align:center;
     border: 1px solid rgba(0,255,136,.1);
-    padding:1rem;
+    padding:1rem 1.2rem;
     border-radius:4px;
   }
 
@@ -194,9 +197,9 @@
   .genre-badge {
     display:inline-block;
     font-family:'Share Tech Mono', monospace;
-    font-size:.65rem;
+    font-size:1rem;
     letter-spacing:.2em;
-    padding:.25rem .7rem;
+    padding:.4rem 1.2rem;
     border-radius:2px;
     margin-bottom:.8rem;
   }
@@ -212,15 +215,15 @@
     background: var(--bg2);
     border: 1px solid rgba(0,255,136,.15);
     border-radius:6px;
-    padding:1.2rem 1rem;
+    padding:1.4rem 1rem;
     margin-bottom:1rem;
-    min-height:120px;
+    min-height:140px;
     display:flex;
     align-items:center;
     justify-content:center;
     text-align:center;
-    font-size:clamp(.9rem, 3.5vw, 1.05rem);
-    line-height:1.7;
+    font-size:clamp(1rem, 4vw, 1.2rem);
+    line-height:1.8;
     position:relative;
     width:100%;
   }
@@ -229,14 +232,14 @@
     position:absolute;
     top:.5rem; left:.7rem;
     font-family:'Share Tech Mono', monospace;
-    font-size:.6rem;
+    font-size:.8rem;
     color: var(--muted);
   }
 
   /* TIMER */
   .timer-wrap { width:100%; margin-bottom:.8rem; }
   .timer-track {
-    width:100%; height:4px;
+    width:100%; height:5px;
     background: rgba(255,255,255,.05);
     border-radius:2px;
     overflow:hidden;
@@ -249,7 +252,7 @@
   }
   .timer-sec {
     font-family:'Share Tech Mono', monospace;
-    font-size:.75rem;
+    font-size:.9rem;
     color: var(--muted);
     text-align:right;
     margin-top:.2rem;
@@ -259,15 +262,15 @@
   .answer-row { display:flex; gap:.8rem; width:100%; }
   .btn-yes, .btn-no {
     flex:1;
-    padding:1rem;
+    padding:1.2rem;
     font-family:'Share Tech Mono', monospace;
-    font-size:1rem;
+    font-size:1.1rem;
     letter-spacing:.15em;
     border-radius:4px;
     cursor:pointer;
     border:1px solid;
     transition: all .1s;
-    min-height:60px;
+    min-height:70px;
   }
   .btn-yes {
     background: rgba(0,255,136,.07);
@@ -383,7 +386,7 @@
 
   .cert-section-title {
     font-family:'Share Tech Mono', monospace;
-    font-size:.68rem;
+    font-size:.85rem;
     letter-spacing:.2em;
     color: var(--green-dim);
     margin-bottom:.5rem;
@@ -391,7 +394,7 @@
 
   .cert-label {
     font-family:'Share Tech Mono', monospace;
-    font-size:.65rem;
+    font-size:.8rem;
     color: var(--muted);
     letter-spacing:.1em;
     min-width:5rem;
@@ -399,12 +402,12 @@
   }
   .cert-value {
     font-family:'Share Tech Mono', monospace;
-    font-size:.9rem;
+    font-size:1rem;
     color: var(--text);
   }
   .cert-unit {
     font-family:'Share Tech Mono', monospace;
-    font-size:.75rem;
+    font-size:.85rem;
     color: var(--muted);
     margin-left:.3rem;
   }
@@ -595,12 +598,12 @@
 
   .review-q-text {
     padding:.1rem .8rem .5rem 3.8rem;
-    font-size:.82rem; line-height:1.6; color:var(--text);
+    font-size:.95rem; line-height:1.7; color:var(--text);
   }
 
   .review-answer-row {
     display:flex; gap:.5rem; padding:0 .8rem .5rem 3.8rem;
-    font-family:'Share Tech Mono', monospace; font-size:.65rem;
+    font-family:'Share Tech Mono', monospace; font-size:.8rem;
   }
   .your-ans { color:var(--muted); }
   .your-ans span { color:var(--text); }
@@ -612,8 +615,8 @@
     padding:.7rem .8rem;
     background: rgba(0,0,0,.2);
     border-radius:4px;
-    font-size:.78rem;
-    line-height:1.75;
+    font-size:.9rem;
+    line-height:1.8;
     color: var(--text);
     opacity:.9;
   }
@@ -943,8 +946,121 @@ function playGameEnd(){
   [523,392,329,261,220].forEach((f,i)=>setTimeout(()=>playTone(f,.2,'sine',.3), i*150));
 }
 
-/* heartbeat interval */
+/* ═══════════════════════════════════════════════════
+   BGM ENGINE（診断中BGM - 緊張感ミニマルサウンド）
+═══════════════════════════════════════════════════ */
+let bgmNodes = [];
+let bgmPlaying = false;
+let bgmStep = 0;
+let bgmBeat = 0;
+let melodyTimeout = null;
+let rhythmTimeout = null;
+
+// Amマイナーペンタトニック系の音列
+const MELODY_NOTES = [110, 130.8, 146.8, 164.8, 196, 220, 261.6, 329.6, 392];
+const MELODY_SEQ   = [0,2,1,4,2,3,1,5, 0,3,2,4,1,2,0,6,
+                      2,1,3,0,4,2,1,3, 5,0,2,4,1,3,2,0];
+
+function startBGM(){
+  if(bgmPlaying) return;
+  bgmPlaying = true;
+  try {
+    const ac = getAudio();
+    // ── ベースドローン ──
+    [55, 110, 164.8].forEach((freq, i) => {
+      const osc = ac.createOscillator();
+      const g   = ac.createGain();
+      const f   = ac.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = 400;
+      osc.type = i === 0 ? 'sine' : 'triangle';
+      osc.frequency.value = freq;
+      g.gain.value = i === 0 ? 0.10 : 0.03;
+      osc.connect(f); f.connect(g); g.connect(ac.destination);
+      osc.start();
+      bgmNodes.push(osc);
+    });
+    bgmStep = 0; bgmBeat = 0;
+    scheduleMelody();
+    scheduleRhythm();
+  } catch(e){}
+}
+
+function scheduleMelody(){
+  if(!bgmPlaying) return;
+  try {
+    const ac  = getAudio();
+    const idx = MELODY_SEQ[bgmStep % MELODY_SEQ.length];
+    const freq = MELODY_NOTES[idx];
+    const dur  = bgmStep % 8 === 0 ? 0.5 : 0.25;
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    const flt  = ac.createBiquadFilter();
+    flt.type = 'bandpass'; flt.frequency.value = freq * 2; flt.Q.value = 2;
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    gain.gain.linearRampToValueAtTime(0.055, ac.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur * 0.85);
+    osc.connect(flt); flt.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + dur);
+    bgmStep++;
+  } catch(e){}
+  melodyTimeout = setTimeout(scheduleMelody, bgmStep % 4 === 0 ? 380 : 270);
+}
+
+function scheduleRhythm(){
+  if(!bgmPlaying) return;
+  const beat = bgmBeat % 8;
+  try {
+    const ac = getAudio();
+    // キック（0・4拍）
+    if(beat === 0 || beat === 4){
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(160, ac.currentTime);
+      o.frequency.exponentialRampToValueAtTime(40, ac.currentTime + 0.15);
+      g.gain.setValueAtTime(0.45, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.2);
+      o.connect(g); g.connect(ac.destination);
+      o.start(); o.stop(ac.currentTime + 0.25);
+    }
+    // スネア（2・6拍）
+    if(beat === 2 || beat === 6){
+      const buf = ac.createBuffer(1, ac.sampleRate*0.1, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+      const s=ac.createBufferSource(), f=ac.createBiquadFilter(), g=ac.createGain();
+      f.type='bandpass'; f.frequency.value=1800; f.Q.value=0.7;
+      g.gain.setValueAtTime(0.18, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.12);
+      s.buffer=buf; s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
+    }
+    // ハイハット（全拍）
+    {
+      const buf = ac.createBuffer(1, ac.sampleRate*0.03, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+      const s=ac.createBufferSource(), f=ac.createBiquadFilter(), g=ac.createGain();
+      f.type='highpass'; f.frequency.value=9000;
+      g.gain.setValueAtTime(beat%2===0?0.09:0.04, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.03);
+      s.buffer=buf; s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
+    }
+    bgmBeat++;
+  } catch(e){}
+  rhythmTimeout = setTimeout(scheduleRhythm, 270);
+}
+
+function stopBGM(){
+  bgmPlaying = false;
+  clearTimeout(melodyTimeout);
+  clearTimeout(rhythmTimeout);
+  bgmNodes.forEach(n=>{ try{ n.stop(); }catch(e){} });
+  bgmNodes = [];
+}
+
 let hbInterval = null;
+
 function startHeartbeat(rate){
   heartRate = rate;
   clearInterval(hbInterval);
@@ -1218,7 +1334,7 @@ const QUESTIONS = [
   {q:"大病を乗り越えた経験がありますか（回復できたなら）？", correct:true, genre:"運"},
   {q:"長寿の家系ですか（両親・祖父母が長生き）？", correct:true, genre:"運"},
   {q:"危険なスポーツや活動を定期的にしていますか？", correct:false, genre:"運"},
-  {q:"自然災害に遭遇したことがありますか（無事だったなら）？", correct:true, genre:"運"},
+  {q:"自然災害に遭遇したことがありますが、無事に乗り越えた経験がありますか？", correct:true, genre:"運"},
   {q:"職場で重大な事故や怪我をしたことがありますか？", correct:false, genre:"運"},
   {q:"普段から安全運転を心がけていますか？", correct:true, genre:"運"},
   {q:"強いストレスが続く時期が1年以上続いていますか？", correct:false, genre:"運"},
@@ -1297,7 +1413,7 @@ const QUESTIONS = [
   {q:"週2回以上、自分でサラダを作って食べますか？", correct:true, genre:"食事"},
   {q:"食べ残しを減らすよう意識していますか？", correct:true, genre:"食事"},
   {q:"コーヒーを1日3杯以上飲みますか？", correct:false, genre:"食事"},
-  {q:"食前にお腹が鳴るほど空腹になることが多いですか？", correct:false, genre:"食事"},
+  {q:"食前にお腹が鳴るほど空腹になることが多いですか？", correct:true, genre:"食事"},
   {q:"旅行中も食事バランスを気にかけていますか？", correct:true, genre:"食事"},
   {q:"週1回以上、温かいスープや汁物を食べていますか？", correct:true, genre:"食事"},
 
@@ -1559,6 +1675,7 @@ function startGame(){
   showScreen('game');
   playGameStart();
   startHeartbeat(1);
+  startBGM();
   updateLifeDisplay();
   setTimeout(()=>loadQuestion(), 500);
 }
@@ -1692,6 +1809,7 @@ function flashFeedback(msg, type){
 function endGame(){
   clearInterval(state.timerInterval);
   stopHeartbeat();
+  stopBGM();
   playGameEnd();
 
   const days = Math.max(0, Math.round(state.currentDays));
@@ -1786,6 +1904,7 @@ function endGame(){
 
 function restart(){
   stopHeartbeat();
+  stopBGM();
   showScreen('title');
 }
 
@@ -1913,6 +2032,10 @@ const EXPERT_COMMENTS = {
   "食後すぐ横になる習慣がありますか？": {
     yes:"食後すぐの就寝は胃食道逆流症（逆流性食道炎）の主要リスク因子です。また血糖値が高い状態での睡眠は脂肪蓄積を促します。食後30分は座位または軽歩行を推奨します。",
     no:"食後に横にならない習慣は胃食道逆流・脂肪蓄積防止に有効です。食後に軽く歩くことで血糖値の上昇を抑える効果も期待できます。"
+  },
+  "食前にお腹が鳴るほど空腹になることが多いですか？": {
+    yes:"適度な空腹はオートファジー（細胞の自己浄化機能）を活性化させます。2016年にノーベル生理学・医学賞を受賞した研究でも、空腹状態が細胞の老廃物除去・若返りを促すことが示されています。食間に十分な空腹時間を設けることは長寿と深く関連しています。",
+    no:"常に満腹の状態が続くとオートファジーが働きにくくなります。食事と食事の間に4〜6時間の空腹時間を設けることで、細胞の自己修復機能が活性化され健康長寿につながるとされています。"
   },
   "鉄分・カルシウム・亜鉛を意識して摂っていますか？": {
     yes:"ミクロ栄養素（鉄・カルシウム・亜鉛）は免疫機能・骨密度・酵素活性に不可欠です。特に女性は月経による鉄損失を補う意識が重要です。",
