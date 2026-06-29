@@ -786,6 +786,16 @@
         <span id="death-weekday"></span>
         <span id="death-age-str"></span>
       </div>
+      <div id="avg-life-compare" style="
+        margin-top:.7rem;
+        padding:.5rem .8rem;
+        background:rgba(0,0,0,.2);
+        border-radius:4px;
+        font-family:'Share Tech Mono', monospace;
+        font-size:.8rem;
+        line-height:1.9;
+        text-align:left;
+      "></div>
     </div>
 
     <div class="cert-divider"></div>
@@ -1869,6 +1879,18 @@ function endGame(){
   document.getElementById('death-date-str').textContent = `${dy}年 ${dm}月 ${dd}日`;
   document.getElementById('death-weekday').textContent = `${dw}曜日`;
   document.getElementById('death-age-str').textContent = `享年 ${deathAge} 歳`;
+
+  // 平均寿命との比較
+  const avgLife = state.gender === 'female' ? 87.1 : 81.1;
+  const genderLabel = state.gender === 'female' ? '女性' : (state.gender === 'male' ? '男性' : 'その他');
+  const diff = deathAge - avgLife;
+  const diffAbs = Math.abs(diff).toFixed(1);
+  const diffText = diff >= 0
+    ? `<span style="color:#00ff88">＋${diffAbs}年 平均より長生き 🎉</span>`
+    : `<span style="color:#ff3344">－${diffAbs}年 平均より短命 ⚠️</span>`;
+  document.getElementById('avg-life-compare').innerHTML =
+    `<span style="color:#aaccbb">日本人${genderLabel}の平均寿命：</span><span style="color:#ffffff">${avgLife} 歳</span><br>` +
+    `<span style="color:#aaccbb">あなたの享年との差：</span>${diffText}`;
 
   // stats
   const statsEl = document.getElementById('result-stats');
