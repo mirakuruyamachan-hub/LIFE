@@ -52,6 +52,12 @@
   body.hide-vitals canvas#ecg { opacity:0; }
   body.hide-scanlines::before { display:none; }
 
+  /* ── 砂嵐トランジション ── */
+  canvas#static-fx {
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:9998; pointer-events:none; opacity:0;
+  }
+
   /* ── SPLASH ── */
   #screen-splash { background:#ffffff !important; }
   @keyframes splashFadeIn {
@@ -101,6 +107,38 @@
     border: 1px solid rgba(0,255,136,.1);
     padding:1rem 1.2rem;
     border-radius:4px;
+  }
+
+  /* ── フッター（提供元／プライバシーポリシー） ── */
+  .footer-credit {
+    margin-top:.8rem;
+    text-align:center;
+  }
+  .footer-provider {
+    font-family:'Share Tech Mono', monospace;
+    font-size:.65rem;
+    letter-spacing:.15em;
+    color: var(--muted);
+    opacity:.6;
+    margin-bottom:.4rem;
+  }
+  .footer-links {
+    font-size:.72rem;
+  }
+  .footer-link {
+    color: var(--green-dim);
+    text-decoration:none;
+    opacity:.85;
+    padding:.2rem;
+  }
+  .footer-link:hover, .footer-link:active {
+    text-decoration:underline;
+    opacity:1;
+  }
+  .footer-sep {
+    color: var(--muted);
+    opacity:.4;
+    margin:0 .5rem;
   }
 
   /* ── INPUT SCREEN ── */
@@ -242,6 +280,28 @@
     line-height:1.8;
     position:relative;
     width:100%;
+    will-change: transform, opacity;
+  }
+  @keyframes cardFlyLeft {
+    0%   { transform: translateX(0) rotate(0deg); opacity:1; }
+    100% { transform: translateX(-160%) rotate(-20deg); opacity:0; }
+  }
+  @keyframes cardFlyRight {
+    0%   { transform: translateX(0) rotate(0deg); opacity:1; }
+    100% { transform: translateX(160%) rotate(20deg); opacity:0; }
+  }
+  @keyframes cardFadeDown {
+    0%   { transform: translateY(0); opacity:1; }
+    100% { transform: translateY(24px); opacity:0; }
+  }
+  @keyframes cardEnter {
+    0%   { transform: scale(.9); opacity:0; }
+    100% { transform: scale(1); opacity:1; }
+  }
+  .question-box.fly-left  { animation: cardFlyLeft .45s cubic-bezier(.4,0,1,1) forwards; pointer-events:none; }
+  .question-box.fly-right { animation: cardFlyRight .45s cubic-bezier(.4,0,1,1) forwards; pointer-events:none; }
+  .question-box.fade-down { animation: cardFadeDown .4s ease-in forwards; pointer-events:none; }
+  .question-box.card-enter { animation: cardEnter .3s ease-out; }
   }
 
   .q-num {
@@ -275,31 +335,70 @@
   }
 
   /* ANSWER BUTTONS */
-  .answer-row { display:flex; gap:.8rem; width:100%; }
+  .answer-row { display:flex; align-items:stretch; gap:.5rem; width:100%; }
+  .swipe-hint {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:.9rem;
+    width:30px;
+    flex-shrink:0;
+  }
+  .swipe-hint .swipe-arrow {
+    font-family:'Share Tech Mono', monospace;
+    font-size:1.2rem;
+    color: var(--muted);
+    opacity:.5;
+  }
+  .swipe-hint .swipe-arrow.left  { animation: swipeNudgeLeft 1.6s ease-in-out infinite; }
+  .swipe-hint .swipe-arrow.right { animation: swipeNudgeRight 1.6s ease-in-out infinite; }
+  @keyframes swipeNudgeLeft {
+    0%, 100% { transform: translateX(0);   opacity:.35; }
+    50%      { transform: translateX(-6px); opacity:.9; }
+  }
+  @keyframes swipeNudgeRight {
+    0%, 100% { transform: translateX(0);   opacity:.35; }
+    50%      { transform: translateX(6px);  opacity:.9; }
+  }
   .btn-yes, .btn-no {
     flex:1;
-    padding:1.2rem;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:.4rem;
+    padding:1.2rem .8rem;
     font-family:'Share Tech Mono', monospace;
-    font-size:1.1rem;
     letter-spacing:.15em;
-    border-radius:4px;
+    border-radius:6px;
     cursor:pointer;
-    border:1px solid;
+    border:2px solid;
     transition: all .1s;
-    min-height:70px;
+    min-height:158px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-yes .btn-arrow, .btn-no .btn-arrow {
+    font-size:2rem;
+    line-height:1;
+  }
+  .btn-yes .btn-label, .btn-no .btn-label {
+    font-size:1.15rem;
+    font-weight:bold;
   }
   .btn-yes {
     background: rgba(0,255,136,.07);
     color: var(--green);
     border-color: rgba(0,255,136,.4);
   }
-  .btn-yes:active { background: rgba(0,255,136,.2); }
+  .btn-yes:active { background: rgba(0,255,136,.25); transform: scale(.97); }
   .btn-no {
     background: rgba(255,51,68,.07);
     color: var(--red);
     border-color: rgba(255,51,68,.4);
   }
-  .btn-no:active { background: rgba(255,51,68,.2); }
+  .btn-no:active { background: rgba(255,51,68,.25); transform: scale(.97); }
 
   .key-hint { font-size:.6rem; color: var(--muted); text-align:center; margin-top:.5rem; letter-spacing:.1em; }
 
@@ -317,12 +416,22 @@
     pointer-events:none;
     z-index:200;
     opacity:0;
-    transition: opacity .1s;
   }
   .feedback.good { color: var(--green); text-shadow: 0 0 40px var(--green); }
   .feedback.bad  { color: var(--red);   text-shadow: 0 0 40px var(--red); }
   .feedback.timeout { color: var(--amber); text-shadow: 0 0 40px var(--amber); }
-  .feedback.show { opacity:1; }
+  .feedback.show {
+    opacity:1;
+    animation: feedbackPop .7s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes feedbackPop {
+    0%   { transform: scale(.2) translateY(30px); opacity:0; }
+    30%  { transform: scale(1.35) translateY(-18px); opacity:1; }
+    50%  { transform: scale(.92) translateY(0); }
+    68%  { transform: scale(1.1) translateY(-6px); }
+    82%  { transform: scale(.97) translateY(0); }
+    100% { transform: scale(1) translateY(0); opacity:1; }
+  }
 
   /* PROGRESS */
   .progress-row {
@@ -659,6 +768,7 @@
 <body class="hide-vitals hide-scanlines">
 
 <canvas id="ecg"></canvas>
+<canvas id="static-fx"></canvas>
 <div class="feedback" id="feedback"></div>
 
 <!-- ══ TITLE SCREEN ══ -->
@@ -691,6 +801,14 @@
     margin-top:.5rem;
     opacity:.7;
   ">※ これはゲームです。医学的な見解は実際と異なることがございます。</div>
+  <div class="footer-credit">
+    <div class="footer-provider">提供: 龍馬の手</div>
+    <div class="footer-links">
+      <a class="footer-link" href="https://sites.google.com/view/ryomanotetsu-lifegame/" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <span class="footer-sep">｜</span>
+      <a class="footer-link" href="mailto:ryoumahouse@gmail.com">お問い合わせ</a>
+    </div>
+  </div>
 </div>
 
 <!-- ══ INPUT SCREEN ══ -->
@@ -755,10 +873,20 @@
     <div class="timer-sec" id="timer-sec">5.0</div>
   </div>
   <div class="answer-row">
-    <button class="btn-yes" id="btn-yes" onclick="answer(true)">← はい</button>
-    <button class="btn-no"  id="btn-no"  onclick="answer(false)">いいえ →</button>
+    <button class="btn-yes" id="btn-yes" onclick="answer(true)">
+      <span class="btn-arrow">←</span>
+      <span class="btn-label">はい</span>
+    </button>
+    <div class="swipe-hint" aria-hidden="true">
+      <span class="swipe-arrow left">‹</span>
+      <span class="swipe-arrow right">›</span>
+    </div>
+    <button class="btn-no" id="btn-no" onclick="answer(false)">
+      <span class="btn-arrow">→</span>
+      <span class="btn-label">いいえ</span>
+    </button>
   </div>
-  <div class="key-hint">PCキー: ← はい ／ → いいえ</div>
+  <div class="key-hint">← はい（スワイプ／キー）　｜　（スワイプ／キー）いいえ →</div>
   <div class="progress-row" id="progress-row"></div>
 </div>
 
@@ -1761,6 +1889,12 @@ function loadQuestion(){
   badge.textContent = q.genre;
   badge.className = 'genre-badge genre-'+q.genre;
 
+  // カードのアニメーションをリセットして入場アニメーションを再生
+  const qbox = document.getElementById('question-box');
+  qbox.classList.remove('fly-left','fly-right','fade-down','card-enter');
+  void qbox.offsetWidth; // reflow を挟んでアニメーションを再トリガー
+  qbox.classList.add('card-enter');
+
   // update current dot
   const dot = document.getElementById('dot-'+state.qIndex);
   if(dot) dot.className='progress-dot current';
@@ -1800,6 +1934,9 @@ function updateTimer(){
 
 function onTimeout(){
   playTimeout();
+  document.getElementById('btn-yes').disabled=true;
+  document.getElementById('btn-no').disabled=true;
+  document.getElementById('question-box').classList.add('fade-down');
   const q = state.questions[state.qIndex];
   // タイムアウトは小さなペナルティ
   const penalty = Math.floor(state.maxDays * 0.008);
@@ -1813,9 +1950,14 @@ function onTimeout(){
 
 /* ── ANSWER ── */
 function answer(isYes){
+  if(document.getElementById('btn-yes').disabled) return; // 連打・二重入力防止
   clearInterval(state.timerInterval);
   document.getElementById('btn-yes').disabled=true;
   document.getElementById('btn-no').disabled=true;
+
+  const qbox = document.getElementById('question-box');
+  qbox.classList.remove('card-enter');
+  qbox.classList.add(isYes ? 'fly-left' : 'fly-right');
 
   const q = state.questions[state.qIndex];
   const correct = (isYes === q.correct);
@@ -1857,8 +1999,10 @@ function nextQuestion(){
 function flashFeedback(msg, type){
   const el=document.getElementById('feedback');
   el.textContent=msg;
+  el.className='feedback'; // 一旦リセットしてアニメーションを再トリガーできるようにする
+  void el.offsetWidth; // reflow
   el.className='feedback '+type+' show';
-  setTimeout(()=>el.classList.remove('show'), 700);
+  setTimeout(()=>el.classList.remove('show'), 800);
 }
 
 /* ── END GAME ── */
@@ -2399,18 +2543,87 @@ function renderReview(){
   }).join('');
 }
 
+/* ── 砂嵐(ノイズ)トランジション ── */
+function playStaticTransition(callback){
+  const canvas = document.getElementById('static-fx');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  // 低解像度バッファにノイズを描き、拡大してドット感を出す
+  const W = 32, H = 18;
+  const buffer = document.createElement('canvas');
+  buffer.width = W; buffer.height = H;
+  const bctx = buffer.getContext('2d');
+  const bufImg = bctx.createImageData(W, H);
+
+  const duration = 550;   // ノイズが見えている時間(ms)
+  const swapAt = 220;     // この時点で裏で画面を切り替える(ノイズで隠れている間に)
+  let swapped = false;
+  let start = null;
+
+  canvas.style.transition = 'none';
+  canvas.style.opacity = '1';
+
+  function frame(now){
+    if(start === null) start = now;
+    const t = now - start;
+
+    // ノイズ生成(グリーン基調のCRT風)
+    const data = bufImg.data;
+    for(let i=0;i<data.length;i+=4){
+      let r,g,b;
+      const flash = Math.random();
+      if(flash > 0.985){
+        r=255; g=255; b=255; // 白い走査ノイズ
+      } else {
+        const shade = Math.random()*200;
+        g = 30 + shade;
+        r = g*0.12;
+        b = g*0.22;
+      }
+      data[i]=r; data[i+1]=g; data[i+2]=b; data[i+3]=255;
+    }
+    bctx.putImageData(bufImg, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+
+    // 頻繁に、水平方向にズレるグリッチ帯を複数本
+    const glitchBands = Math.random() < 0.7 ? 1 + Math.floor(Math.random()*3) : 0;
+    for(let gband=0; gband<glitchBands; gband++){
+      const sliceH = 3 + Math.random()*20;
+      const sy = Math.random()*canvas.height;
+      const dx = (Math.random()-0.5)*60;
+      ctx.drawImage(canvas, 0, sy, canvas.width, sliceH, dx, sy, canvas.width, sliceH);
+    }
+
+    if(!swapped && t >= swapAt){
+      swapped = true;
+      callback && callback();
+    }
+
+    if(t < duration){
+      requestAnimationFrame(frame);
+    } else {
+      canvas.style.transition = 'opacity .3s ease';
+      canvas.style.opacity = '0';
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 /* ── スプラッシュ自動遷移 ── */
 window.addEventListener('load', ()=>{
   const splash = document.getElementById('screen-splash');
   setTimeout(()=>{
-    splash.classList.add('splash-out');
     document.body.classList.remove('hide-vitals');
     document.body.classList.remove('hide-scanlines');
-    setTimeout(()=>{
+    playStaticTransition(()=>{
       splash.classList.remove('active');
-      splash.classList.remove('splash-out');
       document.getElementById('screen-title').classList.add('active');
-    }, 600);
+    });
   }, 2500);
 });
 
@@ -2429,8 +2642,8 @@ document.addEventListener('touchend', e=>{
   if(!document.getElementById('screen-game').classList.contains('active')) return;
   const dx=e.changedTouches[0].clientX - touchStartX;
   if(Math.abs(dx)>60){
-    if(dx>0) answer(true);
-    else answer(false);
+    if(dx<0) answer(true);   // 左にフリック → はい
+    else answer(false);      // 右にフリック → いいえ
   }
 },{passive:true});
 </script>
